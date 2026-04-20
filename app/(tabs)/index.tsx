@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, ImageBackground, TouchableOpacity, Dimensions, StatusBar, Image, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
-import { useRouter, useNavigation } from 'expo-router';
-import { DrawerActions } from '@react-navigation/native';
 import { useAuth } from '@/contexts/AuthContext';
-import Animated, { FadeInDown, FadeInUp, FadeIn, ZoomIn, SlideInRight } from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
+import { DrawerActions } from '@react-navigation/native';
+import { useNavigation, useRouter } from 'expo-router';
+import React from 'react';
+import { Dimensions, Image, ImageBackground, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeInUp, SlideInRight, ZoomIn } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -14,9 +14,9 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { isLoggedIn } = useAuth();
 
-  const ActionButton = ({ icon, text, delay }: { icon: any, text: string, delay: number }) => (
+  const ActionButton = ({ icon, text, delay, route }: { icon: any, text: string, delay: number, route?: object | string }) => (
     <Animated.View entering={ZoomIn.duration(400).delay(delay).springify()}>
-      <TouchableOpacity style={styles.actionBtn}>
+      <TouchableOpacity style={styles.actionBtn} onPress={() => { if (route) router.push(route as any) }}>
         <View style={styles.actionIconWrap}>
           <Feather name={icon} size={22} color="#0f172a" />
         </View>
@@ -28,12 +28,12 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
-      
+
       <ScrollView bounces={true} style={styles.scrollContainer} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        
+
         {/* Animated Hero Layout */}
         <Animated.View entering={FadeInDown.duration(800)} style={styles.heroSection}>
-          <ImageBackground 
+          <ImageBackground
             source={require('../../assets/images/pusaka_bahari_banner_1776493187345.png')}
             style={styles.heroBackground}
           >
@@ -60,10 +60,10 @@ export default function HomeScreen() {
 
               <View style={styles.heroContent}>
                 <Animated.Text entering={FadeIn.duration(800).delay(300)} style={styles.heroTitle}>Warisan{'\n'}Penyengat</Animated.Text>
-                
+
                 <Animated.View entering={FadeInUp.duration(600).delay(500)}>
                   <TouchableOpacity style={styles.exploreBtn} onPress={() => router.push('/map')} activeOpacity={0.8}>
-                     <Text style={styles.exploreBtnText}>Mulai Eksplorasi</Text>
+                    <Text style={styles.exploreBtnText}>Mulai Eksplorasi</Text>
                   </TouchableOpacity>
                 </Animated.View>
               </View>
@@ -84,11 +84,11 @@ export default function HomeScreen() {
         {/* Content Area */}
         <View style={styles.contentArea}>
           <Animated.Text entering={FadeIn.duration(500).delay(500)} style={styles.sectionTitle}>Eksplorasi Populer</Animated.Text>
-          
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
             <Animated.View entering={SlideInRight.duration(600).delay(600).springify()}>
               <TouchableOpacity activeOpacity={0.9} style={styles.popularCard} onPress={() => router.push('/map')}>
-                <Image 
+                <Image
                   source={require('../../assets/images/masjid_penyengat_1776493242751.png')}
                   style={styles.popularCardImg}
                 />
@@ -101,7 +101,7 @@ export default function HomeScreen() {
 
             <Animated.View entering={SlideInRight.duration(600).delay(750).springify()}>
               <TouchableOpacity activeOpacity={0.9} style={styles.popularCard} onPress={() => router.push('/gallery')}>
-                <Image 
+                <Image
                   source={require('../../assets/images/naskah_gurindam_1776493215711.png')}
                   style={styles.popularCardImg}
                 />
@@ -121,17 +121,17 @@ export default function HomeScreen() {
               <Text style={styles.quoteAuthor}>— Raja Ali Haji (Pasal 1)</Text>
             </View>
           </Animated.View>
-          
+
           <Animated.Text entering={FadeIn.duration(500).delay(700)} style={[styles.sectionTitle, { marginTop: 32 }]}>Agenda Budaya</Animated.Text>
           <Animated.View entering={FadeInUp.duration(600).delay(900)}>
             <View style={styles.agendaCard}>
               <View style={styles.agendaDate}>
-                   <Text style={styles.agendaMonth}>Okt</Text>
-                   <Text style={styles.agendaDay}>25</Text>
+                <Text style={styles.agendaMonth}>Okt</Text>
+                <Text style={styles.agendaDay}>25</Text>
               </View>
               <View style={styles.agendaInfo}>
-                   <Text style={styles.agendaTitle}>Festival Pulau Penyengat</Text>
-                   <Text style={styles.agendaDesc}>Pentas budaya dan tur naskah kuno.</Text>
+                <Text style={styles.agendaTitle}>Festival Pulau Penyengat</Text>
+                <Text style={styles.agendaDesc}>Pentas budaya dan tur naskah kuno.</Text>
               </View>
             </View>
           </Animated.View>

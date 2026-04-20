@@ -1,51 +1,106 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-
-type UserData = {
-  name: string;
-  email: string;
-  profilePic: string;
-  progressText: string;
-  progressPercent: string;
-};
+import { supabase } from '@/lib/supabase';
+import { Session, User } from '@supabase/supabase-js';
 
 type AuthContextType = {
   isLoggedIn: boolean;
-  userData: UserData | null;
-  login: () => void;
-  logout: () => void;
+  isAdmin: boolean;
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  register: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   isLoggedIn: false,
-  userData: null,
-  login: () => {},
-  logout: () => {},
+  isAdmin: false,
+  user: null,
+  session: null,
+  loading: true,
+  login: async () => ({ error: null }),
+  register: async () => ({ error: null }),
+  logout: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
+const checkAdminStatus = async (userId: string): Promise<boolean> => {
+  const { data } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', userId)
+    .single();
+  return data?.is_admin ?? false;
+};
 
-  const login = () => {
-    setIsLoggedIn(true);
-    setUserData({
-      name: 'Raja Segara',
-      email: 'pelaut@penyengat.go',
-      profilePic: 'https://i.pravatar.cc/150?img=11',
-      progressText: '100% profile complete',
-      progressPercent: '100%',
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const admin = await checkAdminStatus(session.user.id);
+        setIsAdmin(admin);
+      }
+      setLoading(false);
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const admin = await checkAdminStatus(session.user.id);
+        setIsAdmin(admin);
+      } else {
+        setIsAdmin(false);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    return { error: null };
   };
 
-  const logout = () => {
-    setIsLoggedIn(false);
-    setUserData(null);
+  const register = async (email: string, password: string, fullName: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
+    if (error) return { error: error.message };
+    return { error: null };
+  };
+
+  const logout = async () => {
+    setIsAdmin(false);
+    await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, userData, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!session,
+        isAdmin,
+        user,
+        session,
+        loading,
+        login,
+        register,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

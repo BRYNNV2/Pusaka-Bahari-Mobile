@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import React, { useEffect, useState } from 'react';
+import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const AudioCard = ({ title, desc, audioUrl, thumbImg }: { title: string, desc: string, audioUrl: string, thumbImg: any }) => {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -27,7 +27,7 @@ const AudioCard = ({ title, desc, audioUrl, thumbImg }: { title: string, desc: s
       );
       setSound(newSound);
       setIsPlaying(true);
-      
+
       newSound.setOnPlaybackStatusUpdate((status: any) => {
         if (status.didJustFinish) {
           setIsPlaying(false);
@@ -51,7 +51,7 @@ const AudioCard = ({ title, desc, audioUrl, thumbImg }: { title: string, desc: s
         <Text style={styles.audioDesc}>{desc}</Text>
       </View>
       <TouchableOpacity style={styles.playBtn} onPress={playSound}>
-        <Feather name={isPlaying ? "pause" : "play"} size={16} color="#0f172a" style={isPlaying ? {} : {marginLeft: 2}} />
+        <Feather name={isPlaying ? "pause" : "play"} size={16} color="#0f172a" style={isPlaying ? {} : { marginLeft: 2 }} />
       </TouchableOpacity>
     </View>
   );
@@ -80,7 +80,7 @@ export default function GalleryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
       <SafeAreaView edges={['top']} style={{ flex: 0, backgroundColor: '#ffffff' }} />
       <ScrollView bounces={false} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        
+
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Galeri Naskah</Text>
           <Text style={styles.headerDesc}>Dengarkan mahakarya & amati manuskrip aslinya.</Text>
@@ -89,7 +89,7 @@ export default function GalleryScreen() {
         <Text style={styles.sectionTitle}>Daftar Putar</Text>
         <View style={styles.audioList}>
           {items.map(item => (
-            <AudioCard 
+            <AudioCard
               key={item.id}
               title={item.title}
               desc={item.desc}
@@ -102,16 +102,16 @@ export default function GalleryScreen() {
         <Text style={styles.sectionTitle}>Eksplorasi Mendalam</Text>
         <View style={styles.grid}>
           <View style={styles.gridItem}>
-            <Image 
-              source={require('../../assets/images/naskah_gurindam_1776493215711.png')} 
-              style={styles.gridImg} 
+            <Image
+              source={require('../../assets/images/naskah_gurindam_1776493215711.png')}
+              style={styles.gridImg}
             />
             <Text style={styles.gridText}>Gurindam Asli</Text>
           </View>
           <View style={styles.gridItem}>
-            <Image 
-              source={require('../../assets/images/masjid_penyengat_1776493242751.png')} 
-              style={styles.gridImg} 
+            <Image
+              source={require('../../assets/images/masjid_penyengat_1776493242751.png')}
+              style={styles.gridImg}
             />
             <Text style={styles.gridText}>Masjid Raya</Text>
           </View>
