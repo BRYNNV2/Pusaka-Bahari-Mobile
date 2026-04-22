@@ -1,50 +1,202 @@
-# Welcome to your Expo app 👋
+# 🏛️ Pusaka Bahari — Warisan Raja Ali Haji
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+<p align="center">
+  <img src="./assets/images/pusaka_bahari_banner_1776493187345.png" alt="Pusaka Bahari Banner" width="100%" />
+</p>
 
-## Get started
+<p align="center">
+  <img src="https://img.shields.io/badge/React%20Native-Expo-blue?logo=expo" />
+  <img src="https://img.shields.io/badge/Backend-Supabase-green?logo=supabase" />
+  <img src="https://img.shields.io/badge/Language-TypeScript-blue?logo=typescript" />
+  <img src="https://img.shields.io/badge/Status-Active-brightgreen" />
+</p>
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## 📖 Tentang Aplikasi
 
-2. Start the app
+**Pusaka Bahari** adalah aplikasi mobile berbasis *React Native (Expo)* yang didedikasikan untuk melestarikan dan memperkenalkan warisan budaya dan intelektual **Raja Ali Haji** — ulama, pujangga, dan sejarawan besar dari Pulau Penyengat, Kepulauan Riau.
 
-   ```bash
-   npx expo start
-   ```
+Aplikasi ini mengusung antarmuka modern bergaya *flat & minimalist* yang terinspirasi dari aplikasi premium dunia, dengan koneksi *real-time* ke database **Supabase** untuk pengelolaan data yang dinamis.
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## ✨ Fitur Utama
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### 📱 Navigasi & Tampilan
+- **Beranda (Home Dashboard)** — Tampilan kartu eksplorasi dinamis yang terhubung langsung ke database
+- **Filter Kategori** — Saring warisan berdasarkan tipe: **Artefak, Naskah, Monumen, Benda**
+- **Halaman Detail Artefak** — Tampilan lengkap dengan hero image, deskripsi, informasi, galeri foto, dan peninggalan serupa
+- **Halaman Galeri** — Koleksi foto dan media warisan
+- **Peta Interaktif** — Navigasi lokasi situs bersejarah
+- **Agenda Budaya** — Kalender kegiatan dan acara budaya
 
-## Get a fresh project
+### 🔐 Autentikasi
+- **Login / Register** — Sistem autentikasi lengkap via Supabase Auth
+- **Mode Tamu** — Eksplorasi aplikasi tanpa perlu login
+- **Manajemen Sesi** — Sesi login persisten dan aman
 
-When you're ready, run:
+### 👤 Profil Pengguna
+- **Edit Profil** — Ubah nama, bio, dan nomor telepon
+- **Upload Foto Profil** — Ubah avatar langsung dari kamera atau galeri
+- **Ubah Kata Sandi** — Sistem verifikasi kata sandi lama sebelum pembaruan
+- **Header Melengkung** — Desain header profil dengan tampilan gambar bersejarah + sudut melengkung elegan
 
-```bash
-npm run reset-project
+### 🛠️ Panel Admin (Khusus Admin)
+Akses khusus hanya untuk akun dengan hak **admin**, tersembunyi dari pengguna biasa.
+
+| Modul | Fitur |
+|-------|-------|
+| **Artefak** | Tambah, edit, hapus data artefak + **upload foto cover** |
+| **Lokasi (Peta)** | Kelola titik-titik lokasi bersejarah dengan koordinat GPS |
+| **Galeri** | Tambah item galeri + **upload foto galeri** |
+| **Agenda** | Kelola jadwal acara dan kegiatan budaya |
+
+### 🗄️ Database & Storage (Supabase)
+- Tabel: `artifacts`, `map_locations`, `gallery_items`, `agenda`, `profiles`
+- Storage Bucket: `artifacts`, `gallery`, `avatars` (semua public)
+- Row Level Security (RLS) untuk keamanan data
+
+---
+
+## 🎨 Desain & Estetika
+
+Aplikasi ini dirancang dengan filosofi **"Sultan UI"** — tampilan yang elegan, serius, dan profesional:
+
+- 🎨 **Palet Warna** — Navy Dark (`#0f172a`) + Putih Bersih + Abu-abu Netral
+- ✍️ **Tipografi** — Font sistem dengan bobot 700–800 untuk kesan tegas
+- 🚫 **Anti-AI Aesthetic** — Tanpa gradasi berlebih, tanpa animasi memantul (*bounce*)
+- 📐 **Flat Design** — Tampilan datar, tinggi kontras, bersih dan fungsional
+- 🌀 **Header Melengkung** — Sudut bawah header berbentuk busur pada layar Profil
+
+---
+
+## 🏗️ Struktur Proyek
+
+```
+Mobileproject/
+├── app/
+│   ├── (tabs)/
+│   │   ├── index.tsx        # Beranda utama (Home Dashboard)
+│   │   ├── gallery.tsx      # Halaman galeri
+│   │   ├── map.tsx          # Peta interaktif
+│   │   └── catalog.tsx      # Katalog warisan
+│   ├── admin/
+│   │   └── index.tsx        # Panel Admin CRUD
+│   ├── artifact/
+│   │   └── [id].tsx         # Halaman detail artefak (dynamic route)
+│   ├── profile.tsx          # Halaman profil pengguna
+│   ├── login.tsx            # Halaman login/register
+│   └── _layout.tsx          # Layout navigasi utama
+├── assets/images/           # Gambar aset lokal
+├── contexts/
+│   └── AuthContext.tsx      # Global state autentikasi
+├── lib/
+│   └── supabase.ts          # Konfigurasi Supabase client
+└── .env                     # Environment variables (tidak di-commit)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## ⚙️ Instalasi & Setup
 
-To learn more about developing your project with Expo, look at the following resources:
+### 1. Clone Repository
+```bash
+git clone https://github.com/BRYNNV2/Pusaka-Bahari-Mobile.git
+cd Pusaka-Bahari-Mobile
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-## Join the community
+### 3. Konfigurasi Environment
+Buat file `.env` di root proyek:
+```env
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-Join our community of developers creating universal apps.
+### 4. Setup Database Supabase
+Jalankan SQL berikut di Supabase SQL Editor:
+```sql
+-- Tabel artefak
+CREATE TABLE artifacts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  type TEXT,
+  name TEXT NOT NULL,
+  year TEXT,
+  description TEXT,
+  image_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+-- Tabel lokasi peta
+CREATE TABLE map_locations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  latitude FLOAT,
+  longitude FLOAT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tabel galeri
+CREATE TABLE gallery_items (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  image_url TEXT,
+  audio_url TEXT,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tabel agenda
+CREATE TABLE agenda (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  event_date DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### 5. Jalankan Aplikasi
+```bash
+npx expo start -c
+```
+Scan QR Code menggunakan aplikasi **Expo Go** di HP Anda.
+
+---
+
+## 📸 Screenshot
+
+| Beranda | Detail Artefak | Profil | Panel Admin |
+|---------|---------------|--------|-------------|
+| *(Coming Soon)* | *(Coming Soon)* | *(Coming Soon)* | *(Coming Soon)* |
+
+---
+
+## 🧑‍💻 Dikembangkan dengan
+
+| Teknologi | Keterangan |
+|-----------|-----------|
+| [Expo](https://expo.dev) | Framework React Native |
+| [Supabase](https://supabase.com) | Backend-as-a-Service (Auth + DB + Storage) |
+| [TypeScript](https://typescriptlang.org) | Bahasa pemrograman |
+| [Expo Router](https://expo.github.io/router) | Navigasi berbasis file |
+| [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/) | Animasi performa tinggi |
+| [expo-image-picker](https://docs.expo.dev/versions/latest/sdk/imagepicker/) | Upload foto profil & artefak |
+
+---
+
+## 👨‍🎓 Informasi Akademik
+
+> Proyek ini dikembangkan sebagai bagian dari mata kuliah **Pemrograman Mobile** — Semester 6.
+> Berfokus pada pelestarian warisan budaya **Raja Ali Haji** dari Kepulauan Riau secara digital.
+
+---
+
+<p align="center">Dibuat dengan ❤️ oleh BRYNNV2 · 2026</p>

@@ -156,9 +156,13 @@ export default function HomeScreen() {
                   key={item.id} 
                   style={styles.card} 
                   activeOpacity={0.9} 
-                  onPress={() => router.push(`/gallery`)}
+                  onPress={() => router.push(`/artifact/${item.id}` as any)}
                 >
-                  <Image source={require('../../assets/images/naskah_gurindam_1776493215711.png')} style={styles.cardImage} resizeMode="cover" />
+                  <Image 
+                    source={item.image_url ? { uri: item.image_url } : require('../../assets/images/naskah_gurindam_1776493215711.png')} 
+                    style={styles.cardImage} 
+                    resizeMode="cover" 
+                  />
                   
                   <LinearGradient 
                     colors={['transparent', 'rgba(0,0,0,0.85)']} 

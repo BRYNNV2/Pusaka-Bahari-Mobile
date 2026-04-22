@@ -13,12 +13,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabId = 'artifacts' | 'locations' | 'gallery' | 'agenda';
@@ -53,6 +55,9 @@ export default function AdminPanel() {
   const [aName, setAName] = useState('');
   const [aYear, setAYear] = useState('');
   const [aDesc, setADesc] = useState('');
+  const [aImageUri, setAImageUri] = useState<string | null>(null); // local uri preview
+  const [aImageUrl, setAImageUrl] = useState<string | null>(null); // uploaded url
+  const [uploadingAImg, setUploadingAImg] = useState(false);
   // Locations
   const [lTitle, setLTitle] = useState('');
   const [lDesc,  setLDesc]  = useState('');
@@ -63,6 +68,9 @@ export default function AdminPanel() {
   const [gDesc,  setGDesc]  = useState('');
   const [gAudio, setGAudio] = useState('');
   const [gOrder, setGOrder] = useState('0');
+  const [gImageUri, setGImageUri] = useState<string | null>(null);
+  const [gImageUrl, setGImageUrl] = useState<string | null>(null);
+  const [uploadingGImg, setUploadingGImg] = useState(false);
   // Agenda
   const [agTitle, setAgTitle] = useState('');
   const [agDesc,  setAgDesc]  = useState('');
@@ -99,9 +107,9 @@ export default function AdminPanel() {
 
   // ── Form ─────────────────────────────────────────────────────────────────────
   const resetForm = () => {
-    setAType('Artefak'); setAName(''); setAYear(''); setADesc('');
+    setAType('Artefak'); setAName(''); setAYear(''); setADesc(''); setAImageUri(null); setAImageUrl(null);
     setLTitle(''); setLDesc(''); setLLat(''); setLLng('');
-    setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0');
+    setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null);
     setAgTitle(''); setAgDesc(''); setAgDate('');
     setEditingItem(null);
   };
@@ -113,12 +121,14 @@ export default function AdminPanel() {
     if (activeTab === 'artifacts') {
       setAType(item.type ?? 'Artefak'); setAName(item.name ?? '');
       setAYear(item.year ?? '');       setADesc(item.description ?? '');
+      setAImageUri(item.image_url ?? null); setAImageUrl(item.image_url ?? null);
     } else if (activeTab === 'locations') {
       setLTitle(item.title ?? '');     setLDesc(item.description ?? '');
       setLLat(String(item.latitude ?? '')); setLLng(String(item.longitude ?? ''));
     } else if (activeTab === 'gallery') {
       setGTitle(item.title ?? '');     setGDesc(item.description ?? '');
       setGAudio(item.audio_url ?? ''); setGOrder(String(item.sort_order ?? 0));
+      setGImageUri(item.image_url ?? null); setGImageUrl(item.image_url ?? null);
     } else if (activeTab === 'agenda') {
       setAgTitle(item.title ?? '');    setAgDesc(item.description ?? '');
       setAgDate(item.event_date ?? '');
@@ -133,7 +143,8 @@ export default function AdminPanel() {
         type: aType, 
         name: aName.trim(), 
         year: aYear.trim() || null, 
-        description: aDesc.trim() || null 
+        description: aDesc.trim() || null,
+        image_url: aImageUrl || null,
       };
     }
     if (activeTab === 'locations') {
@@ -151,7 +162,8 @@ export default function AdminPanel() {
         title: gTitle.trim(), 
         description: gDesc.trim() || null, 
         audio_url: gAudio.trim() || null, 
-        sort_order: gOrder.trim() ? parseInt(gOrder) : 0 
+        sort_order: gOrder.trim() ? parseInt(gOrder) : 0,
+        image_url: gImageUrl || null,
       };
     }
     if (activeTab === 'agenda') {
@@ -163,6 +175,50 @@ export default function AdminPanel() {
       };
     }
     return null;
+  };
+
+  // ── Image Upload Helpers ──────────────────────────────────────────────────────
+  const pickAndUploadImage = async (
+    bucket: string,
+    folder: string,
+    setUri: (u: string) => void,
+    setUrl: (u: string) => void,
+    setUploading: (b: boolean) => void,
+  ) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return Alert.alert('Izin Ditolak', 'Butuh izin akses galeri foto.');
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 0.7,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+      const uri = result.assets[0].uri;
+      setUri(uri);
+      setUploading(true);
+
+      const ext  = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `${folder}/${Date.now()}.${ext}`;
+      const formData = new FormData();
+      formData.append('files', {
+        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        name: `upload_${Date.now()}.${ext}`,
+        type: `image/${ext}`,
+      } as any);
+
+      const { error } = await supabase.storage.from(bucket).upload(path, formData, { upsert: true });
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+      setUrl(urlData.publicUrl);
+    } catch (e: any) {
+      Alert.alert('Gagal Upload', e.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -264,6 +320,30 @@ export default function AdminPanel() {
             </TouchableOpacity>
           ))}
         </View>
+
+        <Text style={styles.formLabel}>Foto Utama (Cover)</Text>
+        <TouchableOpacity
+          style={styles.imgPicker}
+          activeOpacity={0.8}
+          onPress={() => pickAndUploadImage('artifacts', 'covers', setAImageUri, setAImageUrl, setUploadingAImg)}
+        >
+          {aImageUri ? (
+            <Image source={{ uri: aImageUri }} style={styles.imgPreview} resizeMode="cover" />
+          ) : (
+            <View style={styles.imgPlaceholder}>
+              <Feather name="image" size={28} color="#94a3b8" />
+              <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih foto</Text>
+            </View>
+          )}
+          {uploadingAImg && (
+            <View style={styles.imgOverlay}>
+              <ActivityIndicator color="#ffffff" />
+              <Text style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Mengupload...</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {aImageUrl && <Text style={styles.imgSuccess}>✓ Foto berhasil diupload</Text>}
+
         <Text style={styles.formLabel}>Nama Artefak <Text style={styles.required}>*</Text></Text>
         <TextInput style={styles.formInput} value={aName} onChangeText={setAName} placeholder="Nama artefak..." placeholderTextColor="#94a3b8" />
         <Text style={styles.formLabel}>Tahun</Text>
@@ -292,6 +372,30 @@ export default function AdminPanel() {
         <TextInput style={styles.formInput} value={gTitle} onChangeText={setGTitle} placeholder="Judul item galeri..." placeholderTextColor="#94a3b8" />
         <Text style={styles.formLabel}>Deskripsi</Text>
         <TextInput style={[styles.formInput, styles.formTextarea]} value={gDesc} onChangeText={setGDesc} placeholder="Deskripsi..." placeholderTextColor="#94a3b8" multiline numberOfLines={3} textAlignVertical="top" />
+
+        <Text style={styles.formLabel}>Foto Galeri</Text>
+        <TouchableOpacity
+          style={styles.imgPicker}
+          activeOpacity={0.8}
+          onPress={() => pickAndUploadImage('gallery', 'items', setGImageUri, setGImageUrl, setUploadingGImg)}
+        >
+          {gImageUri ? (
+            <Image source={{ uri: gImageUri }} style={styles.imgPreview} resizeMode="cover" />
+          ) : (
+            <View style={styles.imgPlaceholder}>
+              <Feather name="image" size={28} color="#94a3b8" />
+              <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih foto</Text>
+            </View>
+          )}
+          {uploadingGImg && (
+            <View style={styles.imgOverlay}>
+              <ActivityIndicator color="#ffffff" />
+              <Text style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Mengupload...</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {gImageUrl && <Text style={styles.imgSuccess}>✓ Foto berhasil diupload</Text>}
+
         <Text style={styles.formLabel}>URL Audio</Text>
         <TextInput style={styles.formInput} value={gAudio} onChangeText={setGAudio} placeholder="https://..." placeholderTextColor="#94a3b8" keyboardType="url" autoCapitalize="none" />
         <Text style={styles.formLabel}>Urutan Tampil</Text>
@@ -511,4 +615,12 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 2, height: 52, borderRadius: 12, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center' },
   saveBtnOff: { backgroundColor: '#94a3b8' },
   saveBtnText: { fontSize: 15, fontWeight: '700', color: '#ffffff' },
+
+  // Image Picker
+  imgPicker: { width: '100%', height: 180, borderRadius: 16, borderWidth: 1.5, borderColor: '#e2e8f0', borderStyle: 'dashed', overflow: 'hidden', backgroundColor: '#f8fafc' },
+  imgPreview: { width: '100%', height: '100%' },
+  imgPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  imgPlaceholderText: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
+  imgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  imgSuccess: { fontSize: 12, color: '#22c55e', fontWeight: '600', marginTop: 6 },
 });
