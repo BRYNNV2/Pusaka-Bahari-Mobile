@@ -30,7 +30,7 @@ const TABS: { id: TabId; label: string; icon: string; table: string }[] = [
   { id: 'agenda',    label: 'Agenda',   icon: 'calendar', table: 'agenda'         },
 ];
 
-const TYPE_OPTIONS = ['Naskah', 'Monumen', 'Benda'];
+const TYPE_OPTIONS = ['Artefak', 'Naskah', 'Monumen', 'Benda'];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminPanel() {
@@ -49,7 +49,7 @@ export default function AdminPanel() {
 
   // ── Form Fields ──────────────────────────────────────────────────────────────
   // Artifacts
-  const [aType, setAType] = useState('Naskah');
+  const [aType, setAType] = useState('Artefak');
   const [aName, setAName] = useState('');
   const [aYear, setAYear] = useState('');
   const [aDesc, setADesc] = useState('');
@@ -99,7 +99,7 @@ export default function AdminPanel() {
 
   // ── Form ─────────────────────────────────────────────────────────────────────
   const resetForm = () => {
-    setAType('Naskah'); setAName(''); setAYear(''); setADesc('');
+    setAType('Artefak'); setAName(''); setAYear(''); setADesc('');
     setLTitle(''); setLDesc(''); setLLat(''); setLLng('');
     setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0');
     setAgTitle(''); setAgDesc(''); setAgDate('');
@@ -111,7 +111,7 @@ export default function AdminPanel() {
   const openEdit = (item: any) => {
     setEditingItem(item);
     if (activeTab === 'artifacts') {
-      setAType(item.type ?? 'Naskah'); setAName(item.name ?? '');
+      setAType(item.type ?? 'Artefak'); setAName(item.name ?? '');
       setAYear(item.year ?? '');       setADesc(item.description ?? '');
     } else if (activeTab === 'locations') {
       setLTitle(item.title ?? '');     setLDesc(item.description ?? '');
@@ -129,19 +129,38 @@ export default function AdminPanel() {
   const getFormData = (): Record<string, any> | null => {
     if (activeTab === 'artifacts') {
       if (!aName.trim()) return null;
-      return { type: aType, name: aName.trim(), year: aYear.trim(), description: aDesc.trim() };
+      return { 
+        type: aType, 
+        name: aName.trim(), 
+        year: aYear.trim() || null, 
+        description: aDesc.trim() || null 
+      };
     }
     if (activeTab === 'locations') {
       if (!lTitle.trim()) return null;
-      return { title: lTitle.trim(), description: lDesc.trim(), latitude: parseFloat(lLat) || 0, longitude: parseFloat(lLng) || 0 };
+      return { 
+        title: lTitle.trim(), 
+        description: lDesc.trim() || null, 
+        latitude: lLat.trim() ? parseFloat(lLat) : null, 
+        longitude: lLng.trim() ? parseFloat(lLng) : null 
+      };
     }
     if (activeTab === 'gallery') {
       if (!gTitle.trim()) return null;
-      return { title: gTitle.trim(), description: gDesc.trim(), audio_url: gAudio.trim(), sort_order: parseInt(gOrder) || 0 };
+      return { 
+        title: gTitle.trim(), 
+        description: gDesc.trim() || null, 
+        audio_url: gAudio.trim() || null, 
+        sort_order: gOrder.trim() ? parseInt(gOrder) : 0 
+      };
     }
     if (activeTab === 'agenda') {
       if (!agTitle.trim()) return null;
-      return { title: agTitle.trim(), description: agDesc.trim(), event_date: agDate.trim() };
+      return { 
+        title: agTitle.trim(), 
+        description: agDesc.trim() || null, 
+        event_date: agDate.trim() || null 
+      };
     }
     return null;
   };
