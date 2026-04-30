@@ -14,13 +14,18 @@ import {
   Platform,
   StatusBar,
   Image,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import MapView, { Marker, MapPressEvent } from 'react-native-maps';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabId = 'artifacts' | 'locations' | 'gallery' | 'agenda';
@@ -55,15 +60,22 @@ export default function AdminPanel() {
   const [aName, setAName] = useState('');
   const [aYear, setAYear] = useState('');
   const [aDesc, setADesc] = useState('');
+  const [aOpenHours, setAOpenHours] = useState('');
   const [aImageUri, setAImageUri] = useState<string | null>(null); // local uri preview
   const [aImageUrl, setAImageUrl] = useState<string | null>(null); // uploaded url
   const [uploadingAImg, setUploadingAImg] = useState(false);
+  const [aLat, setALat] = useState<number | null>(null);
+  const [aLng, setALng] = useState<number | null>(null);
+  // Artifact Gallery Management
+  const [artifactGallery, setArtifactGallery] = useState<any[]>([]);
+  const [uploadingGalleryItem, setUploadingGalleryItem] = useState(false);
+  const [pendingGalleryItem, setPendingGalleryItem] = useState<{ uri: string, type: 'image'|'audio', ext: string, title: string, desc: string } | null>(null);
   // Locations
   const [lTitle, setLTitle] = useState('');
   const [lDesc,  setLDesc]  = useState('');
   const [lLat,   setLLat]   = useState('');
   const [lLng,   setLLng]   = useState('');
-  // Gallery
+  // Gallery (standalone tab)
   const [gTitle, setGTitle] = useState('');
   const [gDesc,  setGDesc]  = useState('');
   const [gAudio, setGAudio] = useState('');
@@ -105,9 +117,109 @@ export default function AdminPanel() {
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
+  // ── Artifact Gallery Helpers ─────────────────────────────────────────────────
+  const fetchArtifactGallery = async (artifactId: number) => {
+    const { data } = await supabase
+      .from('gallery_items')
+      .select('*')
+      .eq('artifact_id', artifactId)
+      .order('sort_order', { ascending: true });
+    setArtifactGallery(data ?? []);
+  };
+
+  const addGalleryItemForArtifact = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return Alert.alert('Izin Ditolak', 'Butuh izin akses galeri foto.');
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 0.7,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
+      if (result.canceled || !result.assets[0]) return;
+
+      const uri = result.assets[0].uri;
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      setPendingGalleryItem({ uri, type: 'image', ext, title: '', desc: '' });
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const addAudioItemForArtifact = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
+      const uri = result.assets[0].uri;
+      const ext = result.assets[0].name.split('.').pop()?.toLowerCase() || 'mp3';
+      setPendingGalleryItem({ uri, type: 'audio', ext, title: '', desc: '' });
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const submitPendingGalleryItem = async (artifactId: number) => {
+    if (!pendingGalleryItem) return;
+    try {
+      setUploadingGalleryItem(true);
+      const { uri, type, ext, title, desc } = pendingGalleryItem;
+      const path = `items/${artifactId}_${type}_${Date.now()}.${ext}`;
+      const formData = new FormData();
+      formData.append('files', {
+        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        name: `gallery_${type}_${Date.now()}.${ext}`,
+        type: `${type === 'image' ? 'image' : 'audio'}/${ext}`,
+      } as any);
+
+      const { error: uploadErr } = await supabase.storage.from('gallery').upload(path, formData, { upsert: true });
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage.from('gallery').getPublicUrl(path);
+
+      // Insert gallery item linked to this artifact
+      const { error: insertErr } = await supabase.from('gallery_items').insert([{
+        artifact_id: artifactId,
+        title: title.trim() || (type === 'image' ? `Foto ${artifactGallery.length + 1}` : `Audio ${artifactGallery.length + 1}`),
+        description: desc.trim() || (type === 'image' ? `Galeri foto artefak` : `Rekaman audio artefak`),
+        image_url: type === 'image' ? urlData.publicUrl : '',
+        audio_url: type === 'audio' ? urlData.publicUrl : '',
+        sort_order: artifactGallery.length,
+      }]);
+      if (insertErr) throw insertErr;
+
+      await fetchArtifactGallery(artifactId);
+      Alert.alert('Berhasil', `${type === 'image' ? 'Foto' : 'Audio'} berhasil ditambahkan!`);
+      setPendingGalleryItem(null);
+    } catch (e: any) {
+      Alert.alert('Gagal Upload', e.message);
+    } finally {
+      setUploadingGalleryItem(false);
+    }
+  };
+
+  const deleteGalleryItemById = (itemId: number, artifactId: number) => {
+    Alert.alert('Hapus Foto', 'Yakin ingin menghapus foto ini?', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus', style: 'destructive',
+        onPress: async () => {
+          await supabase.from('gallery_items').delete().eq('id', itemId);
+          fetchArtifactGallery(artifactId);
+        },
+      },
+    ]);
+  };
+
   // ── Form ─────────────────────────────────────────────────────────────────────
   const resetForm = () => {
-    setAType('Artefak'); setAName(''); setAYear(''); setADesc(''); setAImageUri(null); setAImageUrl(null);
+    setAType('Artefak'); setAName(''); setAYear(''); setADesc(''); setAOpenHours(''); setAImageUri(null); setAImageUrl(null); setALat(null); setALng(null);
+    setArtifactGallery([]);
     setLTitle(''); setLDesc(''); setLLat(''); setLLng('');
     setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null);
     setAgTitle(''); setAgDesc(''); setAgDate('');
@@ -121,7 +233,10 @@ export default function AdminPanel() {
     if (activeTab === 'artifacts') {
       setAType(item.type ?? 'Artefak'); setAName(item.name ?? '');
       setAYear(item.year ?? '');       setADesc(item.description ?? '');
+      setAOpenHours(item.operational_hours ?? '');
       setAImageUri(item.image_url ?? null); setAImageUrl(item.image_url ?? null);
+      setALat(item.latitude ?? null); setALng(item.longitude ?? null);
+      fetchArtifactGallery(item.id);
     } else if (activeTab === 'locations') {
       setLTitle(item.title ?? '');     setLDesc(item.description ?? '');
       setLLat(String(item.latitude ?? '')); setLLng(String(item.longitude ?? ''));
@@ -144,7 +259,10 @@ export default function AdminPanel() {
         name: aName.trim(), 
         year: aYear.trim() || null, 
         description: aDesc.trim() || null,
+        operational_hours: aOpenHours.trim() || null,
         image_url: aImageUrl || null,
+        latitude: aLat,
+        longitude: aLng,
       };
     }
     if (activeTab === 'locations') {
@@ -222,6 +340,20 @@ export default function AdminPanel() {
   };
 
   const handleSave = async () => {
+    // Validasi khusus untuk jadwal operasional
+    if (activeTab === 'artifacts' && aOpenHours.trim()) {
+      const hoursText = aOpenHours.trim();
+      // Mengizinkan format waktu (08:00), kata "Jam", "Libur", atau "Tutup"
+      const isValid = /([0-9]{1,2}[:.][0-9]{2})|([jJ]am)|([lL]ibur)|([tT]utup)/.test(hoursText);
+      if (!isValid) {
+        Alert.alert(
+          'Format Tidak Sesuai', 
+          'Jadwal operasional harus mengandung format waktu (cth: 08:00 - 17:00) atau kata "Jam", "Libur", "Tutup" (cth: Buka 24 Jam).'
+        );
+        return;
+      }
+    }
+
     const formData = getFormData();
     if (!formData) { Alert.alert('Perhatian', 'Nama / Judul wajib diisi.'); return; }
     setSaving(true);
@@ -265,6 +397,11 @@ export default function AdminPanel() {
         </View>
         <Text style={styles.itemTitle}>{item.name}</Text>
         <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
+        {item.latitude && item.longitude ? (
+          <Text style={styles.metaText}>📍 Koordinat tersimpan</Text>
+        ) : (
+          <Text style={[styles.metaText, { color: '#f59e0b' }]}>⚠️ Belum ada koordinat</Text>
+        )}
       </>
     );
     if (activeTab === 'locations') return (
@@ -350,6 +487,187 @@ export default function AdminPanel() {
         <TextInput style={styles.formInput} value={aYear} onChangeText={setAYear} placeholder="cth: 1847" placeholderTextColor="#94a3b8" />
         <Text style={styles.formLabel}>Deskripsi</Text>
         <TextInput style={[styles.formInput, styles.formTextarea]} value={aDesc} onChangeText={setADesc} placeholder="Deskripsi singkat..." placeholderTextColor="#94a3b8" multiline numberOfLines={4} textAlignVertical="top" />
+        
+        <Text style={styles.formLabel}>Jadwal Operasional / Waktu Buka (Opsional)</Text>
+        <TextInput style={styles.formInput} value={aOpenHours} onChangeText={setAOpenHours} placeholder="cth: Buka 24 Jam atau 08:00 - 17:00" placeholderTextColor="#94a3b8" />
+
+        {/* ── Map Picker untuk Koordinat ── */}
+        <Text style={styles.formLabel}>Lokasi di Peta</Text>
+        <Text style={styles.mapPickerHint}>
+          <Ionicons name="information-circle-outline" size={13} color="#64748b" />
+          {' '}Ketuk pada peta untuk menandai lokasi artefak
+        </Text>
+        <View style={styles.mapPickerContainer}>
+          <MapView
+            style={styles.mapPickerMap}
+            initialRegion={{
+              latitude: aLat ?? 0.9255,
+              longitude: aLng ?? 104.4170,
+              latitudeDelta: 0.012,
+              longitudeDelta: 0.012,
+            }}
+            onPress={(e: MapPressEvent) => {
+              const { latitude, longitude } = e.nativeEvent.coordinate;
+              setALat(latitude);
+              setALng(longitude);
+            }}
+            mapType="standard"
+          >
+            {aLat !== null && aLng !== null && (
+              <Marker coordinate={{ latitude: aLat, longitude: aLng }}>
+                <View style={styles.mapPickerMarker}>
+                  <View style={styles.mapPickerMarkerDot} />
+                </View>
+              </Marker>
+            )}
+          </MapView>
+        </View>
+        {aLat !== null && aLng !== null ? (
+          <View style={styles.coordResult}>
+            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+            <Text style={styles.coordResultText}>
+              {aLat.toFixed(6)}, {aLng.toFixed(6)}
+            </Text>
+            <TouchableOpacity onPress={() => { setALat(null); setALng(null); }}>
+              <Feather name="x-circle" size={16} color="#ef4444" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={[styles.metaText, { marginTop: 8, color: '#94a3b8' }]}>Belum ada koordinat dipilih</Text>
+        )}
+
+        {/* ── Galeri & Media untuk Artefak ini ── */}
+        {editingItem && (
+          <>
+            <View style={styles.gallerySectionDivider} />
+            <Text style={styles.gallerySectionTitle}>
+              <Feather name="image" size={16} color="#0f172a" /> Galeri & Media
+            </Text>
+            <Text style={styles.mapPickerHint}>
+              Foto dan audio yang terkait dengan artefak ini. Galeri ini akan muncul di halaman detail artefak.
+            </Text>
+
+            {/* Existing gallery items */}
+            {artifactGallery.length > 0 ? (
+              <View style={styles.galleryGrid}>
+                {artifactGallery.map(item => (
+                  <View key={item.id} style={styles.galleryItemCard}>
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.galleryItemImg} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.galleryItemImg, { backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }]}>
+                        <Feather name="music" size={20} color="#94a3b8" />
+                      </View>
+                    )}
+                    <Text style={styles.galleryItemTitle} numberOfLines={1}>{item.title}</Text>
+                    {item.audio_url && (
+                      <View style={styles.audioIndicator}>
+                        <Feather name="headphones" size={10} color="#3b82f6" />
+                        <Text style={styles.audioIndicatorText}>Audio</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.galleryDeleteBtn}
+                      onPress={() => deleteGalleryItemById(item.id, editingItem.id)}
+                    >
+                      <Feather name="trash-2" size={12} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.galleryEmpty}>
+                <Feather name="image" size={24} color="#cbd5e1" />
+                <Text style={styles.galleryEmptyText}>Belum ada foto/media untuk artefak ini</Text>
+              </View>
+            )}
+
+            {/* Pending Upload Form */}
+            {pendingGalleryItem ? (
+              <View style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginTop: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 12 }}>
+                  Detail {pendingGalleryItem.type === 'image' ? 'Foto' : 'Audio'}
+                </Text>
+                
+                {pendingGalleryItem.type === 'image' && (
+                  <Image source={{ uri: pendingGalleryItem.uri }} style={{ width: '100%', height: 120, borderRadius: 10, marginBottom: 12 }} resizeMode="cover" />
+                )}
+                {pendingGalleryItem.type === 'audio' && (
+                  <View style={{ width: '100%', height: 60, borderRadius: 10, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center', marginBottom: 12, flexDirection: 'row', gap: 8 }}>
+                    <Feather name="music" size={18} color="#64748b" />
+                    <Text style={{ fontSize: 13, color: '#475569', fontWeight: '600' }}>File Audio Siap Diupload</Text>
+                  </View>
+                )}
+
+                <Text style={[styles.formLabel, { fontSize: 12 }]}>Judul Foto/Audio</Text>
+                <TextInput 
+                  style={[styles.formInput, { paddingVertical: 8, fontSize: 13 }]} 
+                  value={pendingGalleryItem.title} 
+                  onChangeText={val => setPendingGalleryItem({ ...pendingGalleryItem, title: val })}
+                  placeholder="Misal: Tampak Depan" 
+                  placeholderTextColor="#94a3b8" 
+                />
+
+                <Text style={[styles.formLabel, { fontSize: 12 }]}>Deskripsi (Boleh Kosong)</Text>
+                <TextInput 
+                  style={[styles.formInput, styles.formTextarea, { fontSize: 13, minHeight: 60 }]} 
+                  value={pendingGalleryItem.desc} 
+                  onChangeText={val => setPendingGalleryItem({ ...pendingGalleryItem, desc: val })}
+                  placeholder="Beri penjelasan tentang media ini..." 
+                  placeholderTextColor="#94a3b8" 
+                  multiline 
+                  numberOfLines={2} 
+                />
+
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity 
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#e2e8f0', alignItems: 'center' }} 
+                    onPress={() => setPendingGalleryItem(null)}
+                    disabled={uploadingGalleryItem}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Batal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#3b82f6', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
+                    onPress={() => submitPendingGalleryItem(editingItem.id)}
+                    disabled={uploadingGalleryItem}
+                  >
+                    {uploadingGalleryItem ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Feather name="upload-cloud" size={16} color="#fff" />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Simpan Media</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <>
+                {/* Add gallery button */}
+                <TouchableOpacity
+                  style={[styles.addGalleryBtn, { marginTop: 12 }]}
+                  onPress={addGalleryItemForArtifact}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="camera" size={18} color="#0f172a" />
+                  <Text style={styles.addGalleryBtnText}>Tambah Foto Galeri</Text>
+                </TouchableOpacity>
+
+                {/* Add audio button */}
+                <TouchableOpacity
+                  style={[styles.addGalleryBtn, { borderColor: '#3b82f6', marginTop: 8 }]}
+                  onPress={addAudioItemForArtifact}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="music" size={18} color="#3b82f6" />
+                  <Text style={[styles.addGalleryBtnText, { color: '#3b82f6' }]}>Tambah Audio/Syair</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </>
+        )}
       </>
     );
 
@@ -623,4 +941,28 @@ const styles = StyleSheet.create({
   imgPlaceholderText: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
   imgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   imgSuccess: { fontSize: 12, color: '#22c55e', fontWeight: '600', marginTop: 6 },
+
+  // Map Picker
+  mapPickerHint: { fontSize: 12, color: '#64748b', marginBottom: 10, lineHeight: 18 },
+  mapPickerContainer: { width: '100%', height: 220, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f1f5f9' },
+  mapPickerMap: { width: '100%', height: '100%' },
+  mapPickerMarker: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(15, 23, 42, 0.2)', alignItems: 'center', justifyContent: 'center' },
+  mapPickerMarkerDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#0f172a', borderWidth: 2, borderColor: '#ffffff' },
+  coordResult: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, backgroundColor: '#f0fdf4', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0' },
+  coordResultText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#166534' },
+
+  // Artifact Gallery Management
+  gallerySectionDivider: { height: 1, backgroundColor: '#e2e8f0', marginTop: 24, marginBottom: 8 },
+  gallerySectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginTop: 12, marginBottom: 4 },
+  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
+  galleryItemCard: { width: (SCREEN_WIDTH - 98) / 3, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', position: 'relative' },
+  galleryItemImg: { width: '100%', height: 80, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  galleryItemTitle: { fontSize: 10, fontWeight: '600', color: '#0f172a', paddingHorizontal: 6, paddingVertical: 4 },
+  audioIndicator: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingBottom: 4 },
+  audioIndicatorText: { fontSize: 9, color: '#3b82f6', fontWeight: '600' },
+  galleryDeleteBtn: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
+  galleryEmpty: { alignItems: 'center', padding: 24, gap: 8, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginTop: 8 },
+  galleryEmptyText: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
+  addGalleryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#0f172a', borderStyle: 'dashed' },
+  addGalleryBtnText: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
 });

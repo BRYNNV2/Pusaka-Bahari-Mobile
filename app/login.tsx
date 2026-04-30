@@ -95,7 +95,7 @@ export default function LoginScreen() {
   };
 
   const handleGuest = () => {
-    router.replace('/');
+    router.replace('/(tabs)');
   };
 
   const translateError = (error: string): string => {

@@ -1,22 +1,63 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar } from 'react-native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar, Animated, Dimensions, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HERO_HEIGHT = 280;
+
+const HERO_IMAGES = [
+  require('../../assets/images/pusaka_bahari_banner_1776493187345.png'),
+  require('../../assets/images/masjid_penyengat_1776493242751.png'),
+  require('../../assets/images/naskah_gurindam_1776493215711.png'),
+];
 
 export default function HomeScreen() {
   const router = useRouter();
   const { isLoggedIn, user, isAdmin } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  // Hero carousel
+  const heroScrollX = useRef(new Animated.Value(0)).current;
+  const heroIndex = useRef(0);
+  const heroScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      heroIndex.current = (heroIndex.current + 1) % HERO_IMAGES.length;
+      heroScrollRef.current?.scrollTo({
+        x: heroIndex.current * (SCREEN_WIDTH - 40),
+        animated: true,
+      });
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
   const categories = ['Semua', 'Artefak', 'Naskah', 'Monumen', 'Benda'];
   const [activeCategory, setActiveCategory] = useState('Semua');
 
   const [artifactsData, setArtifactsData] = useState<any[]>([]);
   const [loadingContent, setLoadingContent] = useState(true);
+  
+  const [showAllMenu, setShowAllMenu] = useState(false);
+
+  const [agendaData, setAgendaData] = useState<any[]>([]);
+
+  const getDayAndMonth = (dateString: string) => {
+    if (!dateString) return { day: '-', month: '-' };
+    try {
+      const date = new Date(dateString);
+      const day = date.getDate().toString().padStart(2, '0');
+      const monthStr = date.toLocaleDateString('id-ID', { month: 'short' }).toUpperCase();
+      return { day, month: monthStr };
+    } catch {
+      return { day: '-', month: '-' };
+    }
+  };
 
   useEffect(() => {
     if (!user) { setAvatarUrl(null); return; }
@@ -41,6 +82,21 @@ export default function HomeScreen() {
     setLoadingContent(false);
   };
 
+  const fetchAgendaFast = async () => {
+    const { data } = await supabase
+      .from('agenda')
+      .select('*')
+      .order('event_date', { ascending: true })
+      .limit(2);
+    setAgendaData(data || []);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchAgendaFast();
+    }, [])
+  );
+
   const FastMenuBtn = ({ icon, label, bg, color, onPress }: any) => (
     <TouchableOpacity style={styles.fastMenuBtn} activeOpacity={0.8} onPress={onPress}>
       <View style={[styles.fastMenuIconWrap, { backgroundColor: bg }]}>
@@ -49,6 +105,20 @@ export default function HomeScreen() {
       <Text style={styles.fastMenuLabel} numberOfLines={1}>{label}</Text>
     </TouchableOpacity>
   );
+
+  const menuItems = [
+    { id: 'map', icon: 'map', label: 'Peta Wisata', onPress: () => router.push('/map') },
+    { id: 'gallery', icon: 'book-open', label: 'Naskah', onPress: () => router.push('/gallery') },
+    { id: 'catalog', icon: 'archive', label: 'Katalog', onPress: () => router.push('/catalog') },
+    { id: 'agenda', icon: 'calendar', label: 'Agenda', onPress: () => router.push('/agenda') },
+    { id: 'profile', icon: 'user', label: 'Profil Saya', onPress: () => isLoggedIn ? router.push('/profile') : router.push('/login') },
+  ];
+
+  if (isAdmin) {
+    menuItems.splice(3, 0, { id: 'admin', icon: 'database', label: 'Data Admin', onPress: () => router.push('/admin') });
+  }
+
+  const visibleMenus = showAllMenu ? menuItems : menuItems.slice(0, 4);
 
   return (
     <View style={styles.container}>
@@ -88,8 +158,88 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* 2. Hero Title */}
-          <Text style={styles.heroTitle}>Temukan Warisan{'\n'}Raja Ali Haji</Text>
+          {/* 2. Hero Carousel */}
+          <View style={styles.heroCard}>
+            <Animated.ScrollView
+              ref={heroScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: heroScrollX } } }],
+                { useNativeDriver: true }
+              )}
+              onMomentumScrollEnd={(e) => {
+                heroIndex.current = Math.round(
+                  e.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 40)
+                );
+              }}
+              style={StyleSheet.absoluteFillObject}
+            >
+              {HERO_IMAGES.map((img, i) => (
+                <Image
+                  key={i}
+                  source={img}
+                  style={{
+                    width: SCREEN_WIDTH - 40,
+                    height: HERO_HEIGHT,
+                  }}
+                  resizeMode="cover"
+                />
+              ))}
+            </Animated.ScrollView>
+
+            <LinearGradient
+              colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.7)']}
+              locations={[0, 1]}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+
+            {/* Hero Content Overlay */}
+            <View style={styles.heroOverlay}>
+              <View style={styles.heroBadge}>
+                <Ionicons name="compass" size={13} color="#fff" />
+                <Text style={styles.heroBadgeText}>Jelajahi Sekarang</Text>
+              </View>
+              <Text style={styles.heroTitle}>Temukan Warisan{"\n"}Raja Ali Haji</Text>
+              <Text style={styles.heroSubtitle}>Pusaka Pulau Penyengat, Kepulauan Riau</Text>
+
+              {/* Dot Indicators */}
+              <View style={styles.heroDots}>
+                {HERO_IMAGES.map((_, i) => {
+                  const inputRange = [
+                    (i - 1) * (SCREEN_WIDTH - 40),
+                    i * (SCREEN_WIDTH - 40),
+                    (i + 1) * (SCREEN_WIDTH - 40),
+                  ];
+                  const dotScale = heroScrollX.interpolate({
+                    inputRange,
+                    outputRange: [1, 1.4, 1],
+                    extrapolate: 'clamp',
+                  });
+                  const dotOpacity = heroScrollX.interpolate({
+                    inputRange,
+                    outputRange: [0.4, 1, 0.4],
+                    extrapolate: 'clamp',
+                  });
+                  return (
+                    <Animated.View
+                      key={i}
+                      style={[
+                        styles.heroDot,
+                        {
+                          transform: [{ scale: dotScale }],
+                          opacity: dotOpacity,
+                        },
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          </View>
 
           {/* 3. Search Bar */}
           <View style={styles.searchContainer}>
@@ -107,18 +257,25 @@ export default function HomeScreen() {
           {/* Akses Cepat (Menu Icons) */}
           <View style={styles.quickMenuHeaderRow}>
             <Text style={styles.quickMenuTitle}>Menu Utama</Text>
-            <TouchableOpacity><Text style={styles.quickMenuSeeAll}>Lihat Semua</Text></TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickMenuContainer}>
-            <FastMenuBtn icon="map" label="Peta Wisata" bg="#f1f5f9" color="#0f172a" onPress={() => router.push('/map')} />
-            <FastMenuBtn icon="book-open" label="Naskah" bg="#f1f5f9" color="#0f172a" onPress={() => router.push('/gallery')} />
-            <FastMenuBtn icon="archive" label="Katalog" bg="#f1f5f9" color="#0f172a" onPress={() => router.push('/catalog')} />
-            {isAdmin && (
-              <FastMenuBtn icon="database" label="Data Admin" bg="#f1f5f9" color="#0f172a" onPress={() => router.push('/admin')} />
+            {menuItems.length > 4 && (
+              <TouchableOpacity onPress={() => setShowAllMenu(!showAllMenu)} activeOpacity={0.7}>
+                <Text style={styles.quickMenuSeeAll}>{showAllMenu ? 'Tutup' : 'Lihat Semua'}</Text>
+              </TouchableOpacity>
             )}
-            <FastMenuBtn icon="user" label="Profil Saya" bg="#f1f5f9" color="#0f172a" onPress={() => isLoggedIn ? router.push('/profile') : router.push('/login')} />
-            <FastMenuBtn icon="grid" label="Lainnya" bg="#f1f5f9" color="#0f172a" onPress={() => {}} />
-          </ScrollView>
+          </View>
+          <View style={styles.quickMenuGrid}>
+            {visibleMenus.map(menu => (
+              <FastMenuBtn 
+                key={menu.id} 
+                icon={menu.icon} 
+                label={menu.label} 
+                bg="#f1f5f9" 
+                color="#0f172a" 
+                onPress={menu.onPress} 
+              />
+            ))}
+          </View>
+
 
           {/* 4. Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
@@ -195,6 +352,36 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {/* Agenda Section — di paling bawah */}
+          {agendaData.length > 0 && (
+            <View style={styles.agendaSectionWrapper}>
+              <View style={styles.quickMenuHeaderRow}>
+                <Text style={styles.quickMenuTitle}>Agenda Mendatang</Text>
+                <TouchableOpacity onPress={() => router.push('/agenda')}>
+                  <Text style={styles.quickMenuSeeAll}>Lihat Semua</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.agendaScroll}>
+                {agendaData.map((item) => {
+                  const dateInfo = getDayAndMonth(item.event_date);
+                  return (
+                    <TouchableOpacity key={item.id} style={styles.agendaCardMini} activeOpacity={0.8} onPress={() => router.push('/agenda')}>
+                      <View style={styles.agendaDateMini}>
+                        <Text style={styles.agendaDayMini}>{dateInfo.day}</Text>
+                        <Text style={styles.agendaMonthMini}>{dateInfo.month}</Text>
+                      </View>
+                      <View style={styles.agendaContentMini}>
+                        <Text style={styles.agendaTitleMini} numberOfLines={1}>{item.title}</Text>
+                        <Text style={styles.agendaDescMini} numberOfLines={1}>{item.description}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -212,7 +399,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 12 : 0,
-    paddingBottom: 120, // Space for bottom tabs
+    paddingBottom: 90, // Space for bottom tabs
   },
   headerRow: {
     flexDirection: 'row',
@@ -278,13 +465,65 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  heroCard: {
+    width: '100%',
+    height: HERO_HEIGHT,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 20,
+    position: 'relative',
+    backgroundColor: '#1e293b',
+  },
+  heroOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: 18,
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  heroBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    marginLeft: 5,
+  },
   heroTitle: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#0f172a',
-    lineHeight: 40,
-    letterSpacing: -1,
-    marginBottom: 24,
+    color: '#ffffff',
+    lineHeight: 33,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  heroDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -327,13 +566,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#3b82f6',
   },
-  quickMenuContainer: {
-    paddingBottom: 24,
+  quickMenuGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingBottom: 4,
+    justifyContent: 'flex-start',
   },
   fastMenuBtn: {
     alignItems: 'center',
-    marginRight: 20,
-    width: 60,
+    width: '25%',
+    marginBottom: 20,
   },
   fastMenuIconWrap: {
     width: 50,
@@ -351,6 +593,63 @@ const styles = StyleSheet.create({
   },
   categoriesContainer: {
     paddingBottom: 24,
+  },
+  agendaSectionWrapper: {
+    marginBottom: 20,
+  },
+  agendaScroll: {
+    paddingBottom: 10,
+  },
+  agendaCardMini: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 12,
+    width: 280,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  agendaDateMini: {
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  agendaDayMini: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  agendaMonthMini: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#3b82f6',
+    marginTop: 1,
+  },
+  agendaContentMini: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  agendaTitleMini: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  agendaDescMini: {
+    fontSize: 12,
+    color: '#64748b',
   },
   categoryPill: {
     paddingHorizontal: 20,
