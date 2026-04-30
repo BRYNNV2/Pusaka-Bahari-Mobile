@@ -1,10 +1,6 @@
 # 🏛️ Pusaka Bahari — Warisan Nusantara Raja Ali Haji
 
 <p align="center">
-  <img src="./assets/images/pusaka_bahari_banner_1776493187345.png" alt="Pusaka Bahari Banner" width="100%" />
-</p>
-
-<p align="center">
   <a href="https://reactnative.dev/"><img src="https://img.shields.io/badge/React%20Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" /></a>
   <a href="https://expo.dev/"><img src="https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white" /></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" /></a>
@@ -85,31 +81,7 @@ EXPO_PUBLIC_SUPABASE_URL=https://[ID_PROYEK].supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=[KUNCI_ANON_PROYEK]
 ```
 
-### 5. Skema Database Utama (Supabase SQL)
-```sql
--- Schema ringkas untuk Artefak & Galeri (contoh)
-CREATE TABLE artifacts (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  type TEXT,
-  name TEXT NOT NULL,
-  year TEXT,
-  description TEXT,
-  image_url TEXT,
-  operational_hours TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE gallery_items (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  artifact_id UUID REFERENCES artifacts(id),
-  title TEXT NOT NULL,
-  description TEXT,
-  image_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### 6. Menjalankan Server Pengembangan
+### 5. Menjalankan Server Pengembangan
 ```bash
 npx expo start -c
 ```
