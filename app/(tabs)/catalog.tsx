@@ -234,7 +234,7 @@ export default function CatalogScreen() {
             data={KAMUS_DATA.filter(k => k.term.toLowerCase().includes(searchTerm.toLowerCase()) || k.definition.toLowerCase().includes(searchTerm.toLowerCase()))}
             keyExtractor={item => item.id}
             renderItem={renderKamusItem}
-            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120, paddingTop: 16, gap: 16 }}
+            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 0, paddingTop: 16, gap: 16 }}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
@@ -251,7 +251,7 @@ export default function CatalogScreen() {
             renderItem={renderItem}
             numColumns={2}
             columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 24 }}
-            contentContainerStyle={{ paddingBottom: 120, paddingTop: 8, gap: 20 }}
+            contentContainerStyle={{ paddingBottom: 0, paddingTop: 8, gap: 20 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchArtifacts(true)} tintColor="#0f172a" />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import {
   View,
@@ -16,9 +16,10 @@ import {
   Modal,
   FlatList,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,10 +54,12 @@ export default function ArtifactDetailScreen() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [zoomImageUri, setZoomImageUri] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!id) return;
-    fetchAll();
-  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return;
+      fetchAll();
+    }, [id])
+  );
 
   const fetchAll = async () => {
     setLoading(true);
@@ -344,26 +347,36 @@ export default function ArtifactDetailScreen() {
                 <Text style={styles.sectionTitle}>Galeri Foto</Text>
                 <Text style={styles.seeAll}>{galleryPhotos.length} foto</Text>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 4 }}>
                 {galleryPhotos.map((item, index) => (
-                  <View key={item.id}>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setCurrentImageIndex(index);
-                        setIsImageViewVisible(true);
-                      }}
-                    >
-                      <Image
-                        source={{ uri: item.image_url }}
-                        style={styles.galleryThumb}
-                        resizeMode="cover"
-                      />
-                    </TouchableOpacity>
-                    {item.title && (
-                      <Text style={styles.galleryThumbLabel} numberOfLines={1}>{item.title}</Text>
-                    )}
-                  </View>
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setCurrentImageIndex(index);
+                      setIsImageViewVisible(true);
+                    }}
+                    style={styles.galleryCard}
+                  >
+                    <Image
+                      source={{ uri: item.image_url }}
+                      style={styles.galleryCardImg}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.7)']}
+                      locations={[0.5, 1]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <View style={styles.galleryCardOverlay}>
+                      <Text style={styles.galleryCardTitle} numberOfLines={1}>
+                        {item.title || `Foto ${index + 1}`}
+                      </Text>
+                    </View>
+                    <View style={styles.galleryZoomBadge}>
+                      <Feather name="zoom-in" size={12} color="#ffffff" />
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
@@ -429,70 +442,94 @@ export default function ArtifactDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Full-screen Article Viewer (Custom Modal) */}
-      <Modal visible={isImageViewVisible} transparent={false} animationType="slide" onRequestClose={() => setIsImageViewVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
-          <SafeAreaView style={{ flex: 1 }}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 }}>
-              <TouchableOpacity onPress={() => setIsImageViewVisible(false)} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center' }}>
-                <Feather name="arrow-left" size={20} color="#0f172a" />
+      {/* Full-screen Photo Viewer (Premium Style) */}
+      <Modal visible={isImageViewVisible} transparent={false} animationType="fade" onRequestClose={() => setIsImageViewVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <StatusBar barStyle="light-content" />
+
+          {/* Swipeable Photos */}
+          <FlatList
+            data={galleryPhotos}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id.toString()}
+            initialScrollIndex={currentImageIndex}
+            getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
+            onMomentumScrollEnd={(e) => {
+              const newIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+              setCurrentImageIndex(newIndex);
+            }}
+            renderItem={({ item }) => (
+              <TouchableOpacity activeOpacity={1} onPress={() => setZoomImageUri(item.image_url)}>
+                <Image source={{ uri: item.image_url }} style={{ width, height }} resizeMode="cover" />
               </TouchableOpacity>
-              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <View style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748b' }}>Geser ke samping &rarr;</Text>
+            )}
+          />
+
+          {/* Top Buttons */}
+          <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10 }}>
+              <TouchableOpacity 
+                onPress={() => setIsImageViewVisible(false)} 
+                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
+              >
+                <Feather name="chevron-left" size={22} color="#ffffff" />
+              </TouchableOpacity>
+              <View style={{ backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, alignSelf: 'center' }}>
+                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '600' }}>{currentImageIndex + 1} / {galleryPhotos.length}</Text>
+              </View>
+              <TouchableOpacity 
+                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
+                onPress={() => setZoomImageUri(galleryPhotos[currentImageIndex]?.image_url)}
+              >
+                <Feather name="zoom-in" size={20} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+
+          {/* Bottom Card Overlay */}
+          <View style={styles.photoDetailCard}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.45 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                  <Ionicons name="location" size={22} color="#ffffff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
+                    {galleryPhotos[currentImageIndex]?.title || artifact?.name}
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                    Pulau Penyengat, Kepulauan Riau
+                  </Text>
                 </View>
               </View>
-            </View>
 
-            <FlatList
-              data={galleryPhotos}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id.toString()}
-              initialScrollIndex={currentImageIndex}
-              getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
-              renderItem={({ item }) => (
-                <ScrollView showsVerticalScrollIndicator={false} bounces={false} style={{ width }}>
-                  {/* Hero Image */}
-                  <View style={{ paddingHorizontal: 20 }}>
-                    <TouchableOpacity activeOpacity={0.9} onPress={() => setZoomImageUri(item.image_url)}>
-                      <Image source={{ uri: item.image_url }} style={{ width: '100%', height: 260, borderRadius: 24 }} resizeMode="cover" />
-                      <View style={{ position: 'absolute', right: 30, bottom: 10, backgroundColor: 'rgba(0,0,0,0.5)', padding: 6, borderRadius: 12 }}>
-                        <Feather name="zoom-in" size={16} color="#fff" />
-                      </View>
-                    </TouchableOpacity>
-                  </View>
+              <View style={styles.photoStatsRow}>
+                <View style={styles.photoStatItem}>
+                  <Feather name="archive" size={14} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.photoStatText}>{artifact?.type}</Text>
+                </View>
+                <View style={styles.photoStatDivider} />
+                <View style={styles.photoStatItem}>
+                  <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.photoStatText}>{artifact?.year || 'Abad 19'}</Text>
+                </View>
+                <View style={styles.photoStatDivider} />
+                <View style={styles.photoStatItem}>
+                  <Ionicons name="star" size={14} color="#fbbf24" />
+                  <Text style={styles.photoStatText}>5.0</Text>
+                </View>
+              </View>
 
-                  {/* Article Content */}
-                  <View style={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}>
-                    <Text style={{ fontSize: 24, fontWeight: '800', color: '#0f172a', lineHeight: 32, marginBottom: 16 }}>
-                      {item.title || `Melihat Lebih Dekat: ${artifact?.name}`}
-                    </Text>
-                    
-                    {/* Author / Meta Row */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}>
-                          <Feather name="camera" size={16} color="#64748b" />
-                        </View>
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#64748b' }}>Pusaka Bahari</Text>
-                      </View>
-                      <Text style={{ fontSize: 13, color: '#94a3b8', fontWeight: '500' }}>
-                        {new Date(item.created_at || Date.now()).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </Text>
-                    </View>
-
-                    {/* Description Paragraph */}
-                    <Text style={{ fontSize: 15, color: '#475569', lineHeight: 26 }}>
-                      {item.description || 'Tidak ada deskripsi tambahan untuk bagian artefak ini.'}
-                    </Text>
-                  </View>
-                </ScrollView>
-              )}
-            />
-          </SafeAreaView>
+              <View style={{ marginTop: 16 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
+                  {galleryPhotos[currentImageIndex]?.description || artifact?.description || 'Tidak ada deskripsi.'}
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
 
@@ -643,9 +680,41 @@ const styles = StyleSheet.create({
   attributeValue:  { fontSize: 14, fontWeight: '700', color: '#0f172a' },
 
   // Gallery
-  galleryRow:      { paddingBottom: 4 },
-  galleryThumb:    { width: 120, height: 90, borderRadius: 12, marginRight: 10 },
-  galleryThumbLabel: { fontSize: 11, color: '#64748b', fontWeight: '500', marginTop: 4, marginRight: 10, width: 120 },
+  galleryCard: {
+    width: 180,
+    height: 220,
+    borderRadius: 18,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#f1f5f9',
+  },
+  galleryCardImg: {
+    width: '100%',
+    height: '100%',
+  },
+  galleryCardOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+  },
+  galleryCardTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  galleryZoomBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // Audio Player
   audioCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f1f5f9' },
@@ -671,4 +740,43 @@ const styles = StyleSheet.create({
   imageViewerFooter: { padding: 24, paddingBottom: 48, backgroundColor: 'rgba(0,0,0,0.4)' },
   imageViewerTitle:  { color: '#ffffff', fontSize: 16, fontWeight: '700', marginBottom: 6 },
   imageViewerDesc:   { color: '#cbd5e1', fontSize: 13, lineHeight: 20 },
+
+  // Photo Detail Modal
+  photoDetailCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+  },
+  photoStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  photoStatItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoStatText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  photoStatDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
 });

@@ -42,9 +42,8 @@ export default function HomeScreen() {
 
   const [artifactsData, setArtifactsData] = useState<any[]>([]);
   const [loadingContent, setLoadingContent] = useState(true);
-  
-  const [showAllMenu, setShowAllMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [agendaData, setAgendaData] = useState<any[]>([]);
 
@@ -107,28 +106,11 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [activeCategory]);
 
-  const FastMenuBtn = ({ icon, label, bg, color, onPress }: any) => (
-    <TouchableOpacity style={styles.fastMenuBtn} activeOpacity={0.8} onPress={onPress}>
-      <View style={[styles.fastMenuIconWrap, { backgroundColor: bg }]}>
-        <Feather name={icon} size={20} color={color} />
-      </View>
-      <Text style={styles.fastMenuLabel} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
+  const filteredArtifacts = artifactsData.filter(item => 
+    item.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const menuItems = [
-    { id: 'map', icon: 'map', label: 'Peta Wisata', onPress: () => router.push('/map') },
-    { id: 'gallery', icon: 'book-open', label: 'Naskah', onPress: () => router.push('/gallery') },
-    { id: 'catalog', icon: 'archive', label: 'Katalog', onPress: () => router.push('/catalog') },
-    { id: 'agenda', icon: 'calendar', label: 'Agenda', onPress: () => router.push('/agenda') },
-    { id: 'profile', icon: 'user', label: 'Profil Saya', onPress: () => isLoggedIn ? router.push('/profile') : router.push('/login') },
-  ];
-
-  if (isAdmin) {
-    menuItems.splice(3, 0, { id: 'admin', icon: 'database', label: 'Data Admin', onPress: () => router.push('/admin') });
-  }
-
-  const visibleMenus = showAllMenu ? menuItems : menuItems.slice(0, 4);
 
   return (
     <View style={styles.container}>
@@ -263,36 +245,51 @@ export default function HomeScreen() {
             <Feather name="search" size={20} color="#64748b" style={styles.searchIcon} />
             <TextInput 
               style={styles.searchInput}
-              placeholder="Cari gurindam, kitab, atau sejarah..."
+              placeholder="Cari naskah, artefak, atau sejarah..."
               placeholderTextColor="#94a3b8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
-            <TouchableOpacity style={styles.filterBtn}>
-              <Ionicons name="options-outline" size={20} color="#0f172a" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Akses Cepat (Menu Icons) */}
-          <View style={styles.quickMenuHeaderRow}>
-            <Text style={styles.quickMenuTitle}>Menu Utama</Text>
-            {menuItems.length > 4 && (
-              <TouchableOpacity onPress={() => setShowAllMenu(!showAllMenu)} activeOpacity={0.7}>
-                <Text style={styles.quickMenuSeeAll}>{showAllMenu ? 'Tutup' : 'Lihat Semua'}</Text>
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity style={styles.filterBtn} onPress={() => setSearchQuery('')}>
+                <Feather name="x" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.filterBtn}>
+                <Ionicons name="options-outline" size={20} color="#0f172a" />
               </TouchableOpacity>
             )}
           </View>
-          <View style={styles.quickMenuGrid}>
-            {visibleMenus.map(menu => (
-              <FastMenuBtn 
-                key={menu.id} 
-                icon={menu.icon} 
-                label={menu.label} 
-                bg="#f1f5f9" 
-                color="#0f172a" 
-                onPress={menu.onPress} 
-              />
-            ))}
-          </View>
 
+          {/* Agenda Section — Dipindah ke Atas */}
+          {agendaData.length > 0 && (
+            <View style={styles.agendaSectionWrapper}>
+              <View style={styles.quickMenuHeaderRow}>
+                <Text style={styles.quickMenuTitle}>Agenda Mendatang</Text>
+                <TouchableOpacity onPress={() => router.push('/agenda')}>
+                  <Text style={styles.quickMenuSeeAll}>Lihat Semua</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.agendaScroll}>
+                {agendaData.map((item) => {
+                  const dateInfo = getDayAndMonth(item.event_date);
+                  return (
+                    <TouchableOpacity key={item.id} style={styles.agendaCardMini} activeOpacity={0.8} onPress={() => router.push('/agenda')}>
+                      <View style={styles.agendaDateMini}>
+                        <Text style={styles.agendaDayMini}>{dateInfo.day}</Text>
+                        <Text style={styles.agendaMonthMini}>{dateInfo.month}</Text>
+                      </View>
+                      <View style={styles.agendaContentMini}>
+                        <Text style={styles.agendaTitleMini} numberOfLines={1}>{item.title}</Text>
+                        <Text style={styles.agendaDescMini} numberOfLines={1}>{item.description}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
           {/* 4. Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
@@ -320,12 +317,16 @@ export default function HomeScreen() {
                 <View style={{ width: '100%', padding: 20, alignItems: 'center' }}>
                   <Text style={{ color: '#94a3b8' }}>Memuat data sejarah...</Text>
                 </View>
-              ) : artifactsData.length === 0 ? (
+              ) : filteredArtifacts.length === 0 ? (
                 <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
-                  <Feather name="inbox" size={32} color="#cbd5e1" style={{ marginBottom: 12 }} />
-                  <Text style={{ color: '#94a3b8', fontWeight: '500' }}>Belum ada data untuk kategori ini.</Text>
+                  <Feather name={searchQuery ? "search" : "inbox"} size={32} color="#cbd5e1" style={{ marginBottom: 12 }} />
+                  <Text style={{ color: '#94a3b8', fontWeight: '500', textAlign: 'center' }}>
+                    {searchQuery 
+                      ? `Tidak ada hasil untuk "${searchQuery}"` 
+                      : 'Belum ada data untuk kategori ini.'}
+                  </Text>
                 </View>
-              ) : artifactsData.map((item) => (
+              ) : filteredArtifacts.map((item) => (
                 <TouchableOpacity 
                   key={item.id} 
                   style={styles.card} 
@@ -369,36 +370,6 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Agenda Section — di paling bawah */}
-          {agendaData.length > 0 && (
-            <View style={styles.agendaSectionWrapper}>
-              <View style={styles.quickMenuHeaderRow}>
-                <Text style={styles.quickMenuTitle}>Agenda Mendatang</Text>
-                <TouchableOpacity onPress={() => router.push('/agenda')}>
-                  <Text style={styles.quickMenuSeeAll}>Lihat Semua</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.agendaScroll}>
-                {agendaData.map((item) => {
-                  const dateInfo = getDayAndMonth(item.event_date);
-                  return (
-                    <TouchableOpacity key={item.id} style={styles.agendaCardMini} activeOpacity={0.8} onPress={() => router.push('/agenda')}>
-                      <View style={styles.agendaDateMini}>
-                        <Text style={styles.agendaDayMini}>{dateInfo.day}</Text>
-                        <Text style={styles.agendaMonthMini}>{dateInfo.month}</Text>
-                      </View>
-                      <View style={styles.agendaContentMini}>
-                        <Text style={styles.agendaTitleMini} numberOfLines={1}>{item.title}</Text>
-                        <Text style={styles.agendaDescMini} numberOfLines={1}>{item.description}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -416,7 +387,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 12 : 0,
-    paddingBottom: 90, // Space for bottom tabs
+    paddingBottom: 20, // Reduced from 90 because tab bar is not absolute
   },
   headerRow: {
     flexDirection: 'row',
@@ -567,6 +538,9 @@ const styles = StyleSheet.create({
     padding: 4,
     marginLeft: 8,
   },
+  categoriesContainer: {
+    paddingBottom: 24,
+  },
   quickMenuHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -582,34 +556,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#3b82f6',
-  },
-  quickMenuGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingBottom: 4,
-    justifyContent: 'flex-start',
-  },
-  fastMenuBtn: {
-    alignItems: 'center',
-    width: '25%',
-    marginBottom: 20,
-  },
-  fastMenuIconWrap: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  fastMenuLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-    textAlign: 'center',
-  },
-  categoriesContainer: {
-    paddingBottom: 24,
   },
   agendaSectionWrapper: {
     marginBottom: 20,

@@ -191,32 +191,33 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      {/* Curved Header Background with Faded Image */}
-      <View style={styles.headerBackground}>
-        <Image 
-          source={require('../assets/images/masjid_penyengat_1776493242751.jpg')}
-          style={{ 
-            width: width, 
-            height: height * 0.23, 
-            position: 'absolute', 
-            bottom: 0, 
-            left: (width * 2.5 - width) / 2, 
-            opacity: 0.25 
-          }}
-          resizeMode="cover"
-        />
-      </View>
-
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View style={styles.headerBar}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-            <Feather name="arrow-left" size={24} color="#ffffff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitleBar}>Profil Akun</Text>
-          <View style={{ width: 40 }} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }} bounces={false}>
+        {/* Curved Header Background with Faded Image */}
+        <View style={styles.headerBackground}>
+          <Image 
+            source={require('../assets/images/masjid_penyengat_1776493242751.jpg')}
+            style={{ 
+              width: width, 
+              height: height * 0.23, 
+              position: 'absolute', 
+              bottom: 0, 
+              left: (width * 2.5 - width) / 2, 
+              opacity: 0.25 
+            }}
+            resizeMode="cover"
+          />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <SafeAreaView edges={['top']} style={styles.safeArea}>
+          <View style={styles.headerBar}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+              <Feather name="arrow-left" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitleBar}>Profil Akun</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.scrollContent}>
           
           {/* Avatar & Profile Info Section */}
           <View style={styles.avatarSection}>
@@ -282,6 +283,21 @@ export default function ProfileScreen() {
             </View>
           </View>
 
+          {/* Admin Menu */}
+          {isAdmin && (
+            <View style={styles.sectionGroup}>
+              <Text style={styles.sectionHeaderTxt}>Administrator</Text>
+              <View style={styles.menuCard}>
+                <MenuRow 
+                  icon="database" 
+                  title="Kelola Data Admin" 
+                  sub="Tambah, ubah, dan hapus data pusaka" 
+                  onPress={() => router.push('/admin')} 
+                />
+              </View>
+            </View>
+          )}
+
           {/* App Settings Group */}
           <View style={styles.sectionGroup}>
             <Text style={styles.sectionHeaderTxt}>Lainnya</Text>
@@ -295,7 +311,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Logout Button */}
-          <View style={[styles.sectionGroup, { marginBottom: 40 }]}>
+          <View style={[styles.sectionGroup, { marginBottom: 0 }]}>
             <TouchableOpacity 
               style={styles.logoutBtn} 
               onPress={async () => { await logout(); router.replace('/login'); }}
@@ -306,8 +322,9 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-        </ScrollView>
-      </SafeAreaView>
+          </View>
+        </SafeAreaView>
+      </ScrollView>
 
       {/* Moda: Edit Profil */}
       {isEditing && (

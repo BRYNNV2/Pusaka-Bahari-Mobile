@@ -81,6 +81,7 @@ export default function AdminPanel() {
   const [artifactGallery, setArtifactGallery] = useState<any[]>([]);
   const [uploadingGalleryItem, setUploadingGalleryItem] = useState(false);
   const [pendingGalleryItem, setPendingGalleryItem] = useState<{ uri: string, type: 'image'|'audio', ext: string, title: string, desc: string, lyrics: string } | null>(null);
+  const [editingGalleryItem, setEditingGalleryItem] = useState<any | null>(null);
   // Locations
   const [lTitle, setLTitle] = useState('');
   const [lDesc,  setLDesc]  = useState('');
@@ -217,7 +218,7 @@ export default function AdminPanel() {
   };
 
   const deleteGalleryItemById = (itemId: number, artifactId: number) => {
-    Alert.alert('Hapus Foto', 'Yakin ingin menghapus foto ini?', [
+    Alert.alert('Hapus Item', 'Yakin ingin menghapus item galeri ini?', [
       { text: 'Batal', style: 'cancel' },
       {
         text: 'Hapus', style: 'destructive',
@@ -227,6 +228,76 @@ export default function AdminPanel() {
         },
       },
     ]);
+  };
+
+  const editGalleryItem = (item: any) => {
+    setEditingGalleryItem({
+      ...item,
+      title: item.title || '',
+      description: item.description || '',
+      lyrics: item.lyrics || '',
+      newImageUri: null, // for replacing photo
+    });
+  };
+
+  const replaceGalleryImage = async () => {
+    if (!editingGalleryItem) return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return Alert.alert('Izin Ditolak', 'Butuh izin akses galeri foto.');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        quality: 0.7,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      setEditingGalleryItem({ ...editingGalleryItem, newImageUri: result.assets[0].uri });
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const updateGalleryItem = async (artifactId: number) => {
+    if (!editingGalleryItem) return;
+    try {
+      setUploadingGalleryItem(true);
+      let newImageUrl = editingGalleryItem.image_url;
+
+      // If user chose a new image, upload it
+      if (editingGalleryItem.newImageUri) {
+        const uri = editingGalleryItem.newImageUri;
+        const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+        const path = `items/${artifactId}_image_${Date.now()}.${ext}`;
+        const formData = new FormData();
+        formData.append('files', {
+          uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+          name: `gallery_replace_${Date.now()}.${ext}`,
+          type: `image/${ext}`,
+        } as any);
+        const { error: uploadErr } = await supabase.storage.from('gallery').upload(path, formData, { upsert: true });
+        if (uploadErr) throw uploadErr;
+        const { data: urlData } = supabase.storage.from('gallery').getPublicUrl(path);
+        newImageUrl = urlData.publicUrl;
+      }
+
+      const { error } = await supabase
+        .from('gallery_items')
+        .update({
+          title: editingGalleryItem.title.trim(),
+          description: editingGalleryItem.description.trim(),
+          lyrics: editingGalleryItem.lyrics?.trim() || null,
+          image_url: newImageUrl,
+        })
+        .eq('id', editingGalleryItem.id);
+      if (error) throw error;
+      Alert.alert('Berhasil', 'Item galeri berhasil diperbarui!');
+      setEditingGalleryItem(null);
+      fetchArtifactGallery(artifactId);
+    } catch (e: any) {
+      Alert.alert('Gagal', e.message);
+    } finally {
+      setUploadingGalleryItem(false);
+    }
   };
 
   // ── Form ─────────────────────────────────────────────────────────────────────
@@ -656,12 +727,20 @@ export default function AdminPanel() {
                         <Text style={styles.audioIndicatorText}>Audio</Text>
                       </View>
                     )}
-                    <TouchableOpacity
-                      style={styles.galleryDeleteBtn}
-                      onPress={() => deleteGalleryItemById(item.id, editingItem.id)}
-                    >
-                      <Feather name="trash-2" size={12} color="#ef4444" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', position: 'absolute', top: 6, right: 6, gap: 4 }}>
+                      <TouchableOpacity
+                        style={[styles.galleryDeleteBtn, { backgroundColor: '#dbeafe', right: undefined, position: 'relative' }]}
+                        onPress={() => editGalleryItem(item)}
+                      >
+                        <Feather name="edit-2" size={12} color="#3b82f6" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.galleryDeleteBtn, { position: 'relative' }]}
+                        onPress={() => deleteGalleryItemById(item.id, editingItem.id)}
+                      >
+                        <Feather name="trash-2" size={12} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -671,6 +750,89 @@ export default function AdminPanel() {
                 <Text style={styles.galleryEmptyText}>Belum ada foto/media untuk artefak ini</Text>
               </View>
             )}
+
+            {/* Edit Gallery Item Form */}
+            {editingGalleryItem ? (
+              <View style={{ backgroundColor: '#eff6ff', padding: 16, borderRadius: 16, marginTop: 12, borderWidth: 1, borderColor: '#bfdbfe' }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1e40af', marginBottom: 12 }}>
+                  ✏️ Edit {editingGalleryItem.audio_url ? 'Audio' : 'Foto'}
+                </Text>
+                
+                {editingGalleryItem.image_url || editingGalleryItem.newImageUri ? (
+                  <View>
+                    <Image source={{ uri: editingGalleryItem.newImageUri || editingGalleryItem.image_url }} style={{ width: '100%', height: 120, borderRadius: 10, marginBottom: 8 }} resizeMode="cover" />
+                    <TouchableOpacity 
+                      onPress={replaceGalleryImage}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 10, backgroundColor: '#dbeafe', marginBottom: 12 }}
+                    >
+                      <Feather name="refresh-cw" size={14} color="#3b82f6" />
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#3b82f6' }}>Ganti Foto</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ width: '100%', height: 50, borderRadius: 10, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center', marginBottom: 12, flexDirection: 'row', gap: 8 }}>
+                    <Feather name="music" size={16} color="#3b82f6" />
+                    <Text style={{ fontSize: 13, color: '#1e40af', fontWeight: '600' }}>File Audio</Text>
+                  </View>
+                )}
+
+                <Text style={[styles.formLabel, { fontSize: 12 }]}>Judul</Text>
+                <TextInput 
+                  style={[styles.formInput, { paddingVertical: 8, fontSize: 13 }]} 
+                  value={editingGalleryItem.title} 
+                  onChangeText={val => setEditingGalleryItem({ ...editingGalleryItem, title: val })}
+                  placeholder="Judul foto/audio" 
+                  placeholderTextColor="#94a3b8" 
+                />
+
+                <Text style={[styles.formLabel, { fontSize: 12 }]}>Deskripsi</Text>
+                <TextInput 
+                  style={[styles.formInput, styles.formTextarea, { fontSize: 13, minHeight: 60 }]} 
+                  value={editingGalleryItem.description} 
+                  onChangeText={val => setEditingGalleryItem({ ...editingGalleryItem, description: val })}
+                  placeholder="Deskripsi..." 
+                  placeholderTextColor="#94a3b8" 
+                  multiline 
+                />
+
+                {editingGalleryItem.audio_url && (
+                  <>
+                    <Text style={[styles.formLabel, { fontSize: 12 }]}>Lirik / Teks Narasi</Text>
+                    <TextInput 
+                      style={[styles.formInput, styles.formTextarea, { fontSize: 13, minHeight: 80 }]} 
+                      value={editingGalleryItem.lyrics} 
+                      onChangeText={val => setEditingGalleryItem({ ...editingGalleryItem, lyrics: val })}
+                      placeholder="Lirik audio..." 
+                      placeholderTextColor="#94a3b8" 
+                      multiline 
+                    />
+                  </>
+                )}
+
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity 
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#e2e8f0', alignItems: 'center' }} 
+                    onPress={() => setEditingGalleryItem(null)}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Batal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#3b82f6', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
+                    onPress={() => updateGalleryItem(editingItem.id)}
+                    disabled={uploadingGalleryItem}
+                  >
+                    {uploadingGalleryItem ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Feather name="check" size={16} color="#fff" />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Perbarui</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
 
             {/* Pending Upload Form */}
             {pendingGalleryItem ? (

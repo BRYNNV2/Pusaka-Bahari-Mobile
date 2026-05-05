@@ -34,6 +34,10 @@ export default function GalleryScreen() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [playerTab, setPlayerTab] = useState<'next' | 'lyrics' | 'related'>('lyrics');
 
+  // Eksplorasi Mendalam
+  const [artifactsData, setArtifactsData] = useState<any[]>([]);
+  const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
+
   const scrollViewRef = useRef<ScrollView>(null);
 
   useFocusEffect(
@@ -44,7 +48,7 @@ export default function GalleryScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchPlaylist();
+    await Promise.all([fetchPlaylist(), fetchGalleryPhotos()]);
     setRefreshing(false);
   }, []);
 
@@ -78,6 +82,22 @@ export default function GalleryScreen() {
     }
     setIsLoading(false);
   };
+
+  const fetchGalleryPhotos = async () => {
+    const { data } = await supabase
+      .from('gallery_items')
+      .select('*, artifacts(name, type, year, description)')
+      .not('image_url', 'is', null)
+      .neq('image_url', '')
+      .order('id', { ascending: false });
+    setArtifactsData(data || []);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchGalleryPhotos();
+    }, [])
+  );
 
   const playTrack = async (track: any) => {
     if (sound) {
@@ -176,8 +196,8 @@ export default function GalleryScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Galeri Naskah</Text>
-          <Text style={styles.headerDesc}>Dengarkan mahakarya & amati manuskrip aslinya.</Text>
+          <Text style={styles.headerTitle}>Galeri & Media</Text>
+          <Text style={styles.headerDesc}>Dengarkan mahakarya & jelajahi koleksi foto pusaka.</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Daftar Putar</Text>
@@ -207,20 +227,131 @@ export default function GalleryScreen() {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Eksplorasi Mendalam</Text>
-        <View style={styles.grid}>
-          <View style={styles.gridItem}>
-            <Image source={require('../../assets/images/naskah_gurindam_1776493215711.jpg')} style={styles.gridImg} />
-            <Text style={styles.gridText}>Gurindam Asli</Text>
-          </View>
-          <View style={styles.gridItem}>
-            <Image source={require('../../assets/images/masjid_penyengat_1776493242751.jpg')} style={styles.gridImg} />
-            <Text style={styles.gridText}>Masjid Raya</Text>
-          </View>
-        </View>
+        <Text style={styles.sectionTitle}>Galeri Foto</Text>
+        <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, paddingHorizontal: 20 }}>
+          {artifactsData.length} koleksi foto naskah & artefak bersejarah
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 8 }}>
+          {artifactsData.length === 0 ? (
+            <View style={{ padding: 30, alignItems: 'center' }}>
+              <Feather name="image" size={40} color="#cbd5e1" style={{ marginBottom: 12 }} />
+              <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Belum ada foto galeri.</Text>
+            </View>
+          ) : (
+            artifactsData.map((item) => (
+              <TouchableOpacity 
+                key={item.id} 
+                style={styles.photoCard}
+                activeOpacity={0.85}
+                onPress={() => setSelectedPhoto(item)}
+              >
+                <Image source={{ uri: item.image_url }} style={styles.exploreImg} />
+                <LinearGradient 
+                  colors={['transparent', 'rgba(0,0,0,0.75)']} 
+                  locations={[0.4, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={styles.exploreOverlay}>
+                  <View style={styles.exploreTypeBadge}>
+                    <Text style={styles.exploreTypeText}>{item.artifacts?.type || 'Foto'}</Text>
+                  </View>
+                  <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: 20 }} />
       </ScrollView>
+
+      {/* MODAL FOTO DETAIL */}
+      {selectedPhoto && (
+        <Modal visible={!!selectedPhoto} animationType="fade" transparent={false} onRequestClose={() => setSelectedPhoto(null)}>
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <StatusBar barStyle="light-content" />
+            
+            {/* Full Background Image */}
+            <Image 
+              source={{ uri: selectedPhoto.image_url }} 
+              style={{ width, height, position: 'absolute' }} 
+              resizeMode="cover"
+            />
+
+            {/* Top Buttons */}
+            <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10 }}>
+                <TouchableOpacity 
+                  onPress={() => setSelectedPhoto(null)} 
+                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
+                >
+                  <Feather name="chevron-left" size={22} color="#ffffff" />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
+                >
+                  <Feather name="bookmark" size={20} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+
+            {/* Bottom Card Overlay */}
+            <View style={styles.photoDetailCard}>
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.45 }}>
+                {/* Location Pin + Title */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <Ionicons name="location" size={22} color="#ffffff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
+                      {selectedPhoto.title || selectedPhoto.artifacts?.name || 'Tanpa Judul'}
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                      Pulau Penyengat, Kepulauan Riau
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Stats Row */}
+                <View style={styles.photoStatsRow}>
+                  <View style={styles.photoStatItem}>
+                    <Feather name="archive" size={14} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.type || 'Foto'}</Text>
+                  </View>
+                  <View style={styles.photoStatDivider} />
+                  <View style={styles.photoStatItem}>
+                    <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || 'Abad 19'}</Text>
+                  </View>
+                  <View style={styles.photoStatDivider} />
+                  <View style={styles.photoStatItem}>
+                    <Ionicons name="star" size={14} color="#fbbf24" />
+                    <Text style={styles.photoStatText}>5.0</Text>
+                  </View>
+                </View>
+
+                {/* Description */}
+                <View style={{ marginTop: 16 }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
+                    {selectedPhoto.description || selectedPhoto.artifacts?.description || 'Tidak ada deskripsi untuk foto ini.'}
+                  </Text>
+                </View>
+
+                {/* Close Button */}
+                <TouchableOpacity 
+                  onPress={() => setSelectedPhoto(null)} 
+                  style={styles.photoCloseBtn}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Tutup</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {/* SPOTIFY-STYLE MUSIC PLAYER MODAL */}
       <Modal visible={showPlayer} animationType="slide" presentationStyle="fullScreen">
@@ -638,5 +769,95 @@ const styles = StyleSheet.create({
   expandedContent: {
     flex: 1,
     paddingHorizontal: 24,
-  }
+  },
+
+  // Galeri Foto
+  photoCard: {
+    width: 200,
+    height: 260,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
+    position: 'relative',
+  },
+  exploreImg: {
+    width: '100%',
+    height: '100%',
+  },
+  exploreOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 14,
+  },
+  exploreTypeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  exploreTypeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  exploreName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Photo Detail Modal
+  photoDetailCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+    backdropFilter: 'blur(20px)',
+  },
+  photoStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  photoStatItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoStatText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  photoStatDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  photoCloseBtn: {
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
 });
