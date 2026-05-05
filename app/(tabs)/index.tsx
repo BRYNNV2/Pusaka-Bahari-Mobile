@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar, Animated, Dimensions, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar, Animated, Dimensions, Easing, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -11,9 +11,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 280;
 
 const HERO_IMAGES = [
-  require('../../assets/images/pusaka_bahari_banner_1776493187345.png'),
-  require('../../assets/images/masjid_penyengat_1776493242751.png'),
-  require('../../assets/images/naskah_gurindam_1776493215711.png'),
+  require('../../assets/images/pusaka_bahari_banner_1776493187345.jpg'),
+  require('../../assets/images/masjid_penyengat_1776493242751.jpg'),
+  require('../../assets/images/naskah_gurindam_1776493215711.jpg'),
 ];
 
 export default function HomeScreen() {
@@ -44,6 +44,7 @@ export default function HomeScreen() {
   const [loadingContent, setLoadingContent] = useState(true);
   
   const [showAllMenu, setShowAllMenu] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [agendaData, setAgendaData] = useState<any[]>([]);
 
@@ -97,6 +98,15 @@ export default function HomeScreen() {
     }, [])
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchArtifacts(),
+      fetchAgendaFast()
+    ]);
+    setRefreshing(false);
+  }, [activeCategory]);
+
   const FastMenuBtn = ({ icon, label, bg, color, onPress }: any) => (
     <TouchableOpacity style={styles.fastMenuBtn} activeOpacity={0.8} onPress={onPress}>
       <View style={[styles.fastMenuIconWrap, { backgroundColor: bg }]}>
@@ -125,7 +135,14 @@ export default function HomeScreen() {
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <ScrollView bounces={true} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          bounces={true} 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0088CC" colors={['#0088CC']} />
+          }
+        >
           
           {/* 1. Header Row */}
           <View style={styles.headerRow}>
@@ -316,7 +333,7 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/artifact/${item.id}` as any)}
                 >
                   <Image 
-                    source={item.image_url ? { uri: item.image_url } : require('../../assets/images/naskah_gurindam_1776493215711.png')} 
+                    source={item.image_url ? { uri: item.image_url } : require('../../assets/images/naskah_gurindam_1776493215711.jpg')} 
                     style={styles.cardImage} 
                     resizeMode="cover" 
                   />

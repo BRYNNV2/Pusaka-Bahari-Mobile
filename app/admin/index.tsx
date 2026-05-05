@@ -28,10 +28,11 @@ import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type TabId = 'artifacts' | 'locations' | 'gallery' | 'agenda';
+type TabId = 'artifacts' | 'catalogs' | 'locations' | 'gallery' | 'agenda';
 
 const TABS: { id: TabId; label: string; icon: string; table: string }[] = [
   { id: 'artifacts', label: 'Artefak',  icon: 'archive',  table: 'artifacts'      },
+  { id: 'catalogs',  label: 'Katalog',  icon: 'book',     table: 'catalogs'       },
   { id: 'locations', label: 'Lokasi',   icon: 'map-pin',  table: 'map_locations'  },
   { id: 'gallery',   label: 'Galeri',   icon: 'image',    table: 'gallery_items'  },
   { id: 'agenda',    label: 'Agenda',   icon: 'calendar', table: 'agenda'         },
@@ -51,10 +52,20 @@ export default function AdminPanel() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem]   = useState<any | null>(null);
   const [stats, setStats]               = useState<Record<TabId, number>>({
-    artifacts: 0, locations: 0, gallery: 0, agenda: 0,
+    artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0,
   });
 
   // ── Form Fields ──────────────────────────────────────────────────────────────
+  // Catalogs
+  const [cType, setCType] = useState('Benda');
+  const [cName, setCName] = useState('');
+  const [cYear, setCYear] = useState('');
+  const [cLocation, setCLocation] = useState('');
+  const [cDesc, setCDesc] = useState('');
+  const [cImageUri, setCImageUri] = useState<string | null>(null);
+  const [cImageUrl, setCImageUrl] = useState<string | null>(null);
+  const [uploadingCImg, setUploadingCImg] = useState(false);
+
   // Artifacts
   const [aType, setAType] = useState('Artefak');
   const [aName, setAName] = useState('');
@@ -69,7 +80,7 @@ export default function AdminPanel() {
   // Artifact Gallery Management
   const [artifactGallery, setArtifactGallery] = useState<any[]>([]);
   const [uploadingGalleryItem, setUploadingGalleryItem] = useState(false);
-  const [pendingGalleryItem, setPendingGalleryItem] = useState<{ uri: string, type: 'image'|'audio', ext: string, title: string, desc: string } | null>(null);
+  const [pendingGalleryItem, setPendingGalleryItem] = useState<{ uri: string, type: 'image'|'audio', ext: string, title: string, desc: string, lyrics: string } | null>(null);
   // Locations
   const [lTitle, setLTitle] = useState('');
   const [lDesc,  setLDesc]  = useState('');
@@ -83,6 +94,7 @@ export default function AdminPanel() {
   const [gImageUri, setGImageUri] = useState<string | null>(null);
   const [gImageUrl, setGImageUrl] = useState<string | null>(null);
   const [uploadingGImg, setUploadingGImg] = useState(false);
+  const [gLyrics, setGLyrics] = useState('');
   // Agenda
   const [agTitle, setAgTitle] = useState('');
   const [agDesc,  setAgDesc]  = useState('');
@@ -107,7 +119,7 @@ export default function AdminPanel() {
         supabase.from(tab.table).select('id', { count: 'exact', head: true })
       )
     );
-    const newStats: Record<TabId, number> = { artifacts: 0, locations: 0, gallery: 0, agenda: 0 };
+    const newStats: Record<TabId, number> = { artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0 };
     TABS.forEach((tab, i) => {
       newStats[tab.id] = results[i].count ?? 0;
     });
@@ -141,7 +153,7 @@ export default function AdminPanel() {
 
       const uri = result.assets[0].uri;
       const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      setPendingGalleryItem({ uri, type: 'image', ext, title: '', desc: '' });
+      setPendingGalleryItem({ uri, type: 'image', ext, title: '', desc: '', lyrics: '' });
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -158,7 +170,7 @@ export default function AdminPanel() {
 
       const uri = result.assets[0].uri;
       const ext = result.assets[0].name.split('.').pop()?.toLowerCase() || 'mp3';
-      setPendingGalleryItem({ uri, type: 'audio', ext, title: '', desc: '' });
+      setPendingGalleryItem({ uri, type: 'audio', ext, title: '', desc: '', lyrics: '' });
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -168,7 +180,7 @@ export default function AdminPanel() {
     if (!pendingGalleryItem) return;
     try {
       setUploadingGalleryItem(true);
-      const { uri, type, ext, title, desc } = pendingGalleryItem;
+      const { uri, type, ext, title, desc, lyrics } = pendingGalleryItem;
       const path = `items/${artifactId}_${type}_${Date.now()}.${ext}`;
       const formData = new FormData();
       formData.append('files', {
@@ -189,6 +201,7 @@ export default function AdminPanel() {
         description: desc.trim() || (type === 'image' ? `Galeri foto artefak` : `Rekaman audio artefak`),
         image_url: type === 'image' ? urlData.publicUrl : '',
         audio_url: type === 'audio' ? urlData.publicUrl : '',
+        lyrics: type === 'audio' && lyrics.trim() ? lyrics.trim() : null,
         sort_order: artifactGallery.length,
       }]);
       if (insertErr) throw insertErr;
@@ -220,8 +233,9 @@ export default function AdminPanel() {
   const resetForm = () => {
     setAType('Artefak'); setAName(''); setAYear(''); setADesc(''); setAOpenHours(''); setAImageUri(null); setAImageUrl(null); setALat(null); setALng(null);
     setArtifactGallery([]);
+    setCType('Benda'); setCName(''); setCYear(''); setCLocation(''); setCDesc(''); setCImageUri(null); setCImageUrl(null);
     setLTitle(''); setLDesc(''); setLLat(''); setLLng('');
-    setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null);
+    setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null); setGLyrics('');
     setAgTitle(''); setAgDesc(''); setAgDate('');
     setEditingItem(null);
   };
@@ -237,6 +251,11 @@ export default function AdminPanel() {
       setAImageUri(item.image_url ?? null); setAImageUrl(item.image_url ?? null);
       setALat(item.latitude ?? null); setALng(item.longitude ?? null);
       fetchArtifactGallery(item.id);
+    } else if (activeTab === 'catalogs') {
+      setCType(item.type ?? 'Benda'); setCName(item.name ?? '');
+      setCYear(item.year ?? '');      setCLocation(item.location ?? ''); 
+      setCDesc(item.description ?? '');
+      setCImageUri(item.image_url ?? null); setCImageUrl(item.image_url ?? null);
     } else if (activeTab === 'locations') {
       setLTitle(item.title ?? '');     setLDesc(item.description ?? '');
       setLLat(String(item.latitude ?? '')); setLLng(String(item.longitude ?? ''));
@@ -244,6 +263,7 @@ export default function AdminPanel() {
       setGTitle(item.title ?? '');     setGDesc(item.description ?? '');
       setGAudio(item.audio_url ?? ''); setGOrder(String(item.sort_order ?? 0));
       setGImageUri(item.image_url ?? null); setGImageUrl(item.image_url ?? null);
+      setGLyrics(item.lyrics ?? '');
     } else if (activeTab === 'agenda') {
       setAgTitle(item.title ?? '');    setAgDesc(item.description ?? '');
       setAgDate(item.event_date ?? '');
@@ -265,6 +285,17 @@ export default function AdminPanel() {
         longitude: aLng,
       };
     }
+    if (activeTab === 'catalogs') {
+      if (!cName.trim()) return null;
+      return { 
+        type: cType, 
+        name: cName.trim(), 
+        year: cYear.trim() || null, 
+        location: cLocation.trim() || null,
+        description: cDesc.trim() || null,
+        image_url: cImageUrl || null,
+      };
+    }
     if (activeTab === 'locations') {
       if (!lTitle.trim()) return null;
       return { 
@@ -280,6 +311,7 @@ export default function AdminPanel() {
         title: gTitle.trim(), 
         description: gDesc.trim() || null, 
         audio_url: gAudio.trim() || null, 
+        lyrics: gLyrics.trim() || null,
         sort_order: gOrder.trim() ? parseInt(gOrder) : 0,
         image_url: gImageUrl || null,
       };
@@ -404,6 +436,16 @@ export default function AdminPanel() {
         )}
       </>
     );
+    if (activeTab === 'catalogs') return (
+      <>
+        <View style={styles.itemRow}>
+          <View style={styles.badge}><Text style={styles.badgeText}>{item.type}</Text></View>
+          <Text style={styles.metaText}>{item.year}</Text>
+        </View>
+        <Text style={styles.itemTitle}>{item.name}</Text>
+        <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
+      </>
+    );
     if (activeTab === 'locations') return (
       <>
         <Text style={styles.itemTitle}>{item.title}</Text>
@@ -443,6 +485,54 @@ export default function AdminPanel() {
   );
 
   const renderForm = () => {
+    if (activeTab === 'catalogs') return (
+      <>
+        <Text style={styles.formLabel}>Kategori / Tipe</Text>
+        <View style={styles.typeRow}>
+          {['Benda', 'Tradisi', 'Naskah', 'Monumen'].map(opt => (
+            <TouchableOpacity
+              key={opt}
+              style={[styles.typeChip, cType === opt && styles.typeChipActive]}
+              onPress={() => setCType(opt)}
+            >
+              <Text style={[styles.typeChipText, cType === opt && styles.typeChipTextActive]}>{opt}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.formLabel}>Foto Ilustrasi</Text>
+        <TouchableOpacity
+          style={styles.imgPicker}
+          activeOpacity={0.8}
+          onPress={() => pickAndUploadImage('gallery', 'catalogs', setCImageUri, setCImageUrl, setUploadingCImg)}
+        >
+          {cImageUri ? (
+            <Image source={{ uri: cImageUri }} style={styles.imgPreview} resizeMode="cover" />
+          ) : (
+            <View style={styles.imgPlaceholder}>
+              <Feather name="image" size={28} color="#94a3b8" />
+              <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih foto</Text>
+            </View>
+          )}
+          {uploadingCImg && (
+            <View style={styles.imgOverlay}>
+              <ActivityIndicator color="#ffffff" />
+              <Text style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Mengupload...</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {cImageUrl && <Text style={styles.imgSuccess}>✓ Foto berhasil diupload</Text>}
+
+        <Text style={styles.formLabel}>Nama Pusaka / Tradisi <Text style={styles.required}>*</Text></Text>
+        <TextInput style={styles.formInput} value={cName} onChangeText={setCName} placeholder="cth: Perahu Jong" placeholderTextColor="#94a3b8" />
+        <Text style={styles.formLabel}>Tahun / Era</Text>
+        <TextInput style={styles.formInput} value={cYear} onChangeText={setCYear} placeholder="cth: Tradisional atau Abad 18" placeholderTextColor="#94a3b8" />
+        <Text style={styles.formLabel}>Lokasi Penyimpanan</Text>
+        <TextInput style={styles.formInput} value={cLocation} onChangeText={setCLocation} placeholder="cth: Museum Bahari atau Koleksi Pribadi" placeholderTextColor="#94a3b8" />
+        <Text style={styles.formLabel}>Deskripsi Lengkap</Text>
+        <TextInput style={[styles.formInput, styles.formTextarea]} value={cDesc} onChangeText={setCDesc} placeholder="Tuliskan sejarah dan deskripsinya..." placeholderTextColor="#94a3b8" multiline numberOfLines={5} textAlignVertical="top" />
+      </>
+    );
     if (activeTab === 'artifacts') return (
       <>
         <Text style={styles.formLabel}>Tipe Artefak</Text>
@@ -619,6 +709,21 @@ export default function AdminPanel() {
                   numberOfLines={2} 
                 />
 
+                {pendingGalleryItem.type === 'audio' && (
+                  <>
+                    <Text style={[styles.formLabel, { fontSize: 12 }]}>Lirik / Teks Narasi (Opsional)</Text>
+                    <TextInput 
+                      style={[styles.formInput, styles.formTextarea, { fontSize: 13, minHeight: 80 }]} 
+                      value={pendingGalleryItem.lyrics} 
+                      onChangeText={val => setPendingGalleryItem({ ...pendingGalleryItem, lyrics: val })}
+                      placeholder="Paste lirik di sini. Setiap baris akan berganti otomatis." 
+                      placeholderTextColor="#94a3b8" 
+                      multiline 
+                      numberOfLines={4} 
+                    />
+                  </>
+                )}
+
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
                   <TouchableOpacity 
                     style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#e2e8f0', alignItems: 'center' }} 
@@ -716,6 +821,10 @@ export default function AdminPanel() {
 
         <Text style={styles.formLabel}>URL Audio</Text>
         <TextInput style={styles.formInput} value={gAudio} onChangeText={setGAudio} placeholder="https://..." placeholderTextColor="#94a3b8" keyboardType="url" autoCapitalize="none" />
+        
+        <Text style={styles.formLabel}>Lirik / Teks Narasi (Opsional)</Text>
+        <TextInput style={[styles.formInput, styles.formTextarea]} value={gLyrics} onChangeText={setGLyrics} placeholder="Paste lirik di sini..." placeholderTextColor="#94a3b8" multiline numberOfLines={4} textAlignVertical="top" />
+
         <Text style={styles.formLabel}>Urutan Tampil</Text>
         <TextInput style={styles.formInput} value={gOrder} onChangeText={setGOrder} placeholder="0" placeholderTextColor="#94a3b8" keyboardType="numeric" />
       </>

@@ -15,6 +15,7 @@ import {
   Alert,
   Modal,
   FlatList,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -32,9 +33,9 @@ const TYPE_ICON: Record<string, string> = {
   Benda:   'box',
 };
 
-const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.png');
-const FALLBACK_IMAGE2 = require('../../assets/images/masjid_penyengat_1776493242751.png');
-const FALLBACK_IMAGE3 = require('../../assets/images/pusaka_bahari_banner_1776493187345.png');
+const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.jpg');
+const FALLBACK_IMAGE2 = require('../../assets/images/masjid_penyengat_1776493242751.jpg');
+const FALLBACK_IMAGE3 = require('../../assets/images/pusaka_bahari_banner_1776493187345.jpg');
 
 export default function ArtifactDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,6 +45,7 @@ export default function ArtifactDetailScreen() {
   const [gallery, setGallery]     = useState<any[]>([]);
   const [related, setRelated]     = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded]   = useState(false);
 
   // Image Viewer State
@@ -86,6 +88,12 @@ export default function ArtifactDetailScreen() {
     }
 
     setLoading(false);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAll();
+    setRefreshing(false);
   };
 
   const handleShare = async () => {
@@ -194,7 +202,13 @@ export default function ArtifactDetailScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        bounces={true}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" colors={['#0088CC']} progressViewOffset={40} />
+        }
+      >
         {/* ── Hero Image ── */}
         <View style={styles.heroContainer}>
           <Image

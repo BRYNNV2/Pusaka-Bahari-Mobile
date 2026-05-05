@@ -194,7 +194,7 @@ export default function ProfileScreen() {
       {/* Curved Header Background with Faded Image */}
       <View style={styles.headerBackground}>
         <Image 
-          source={require('../assets/images/masjid_penyengat_1776493242751.png')}
+          source={require('../assets/images/masjid_penyengat_1776493242751.jpg')}
           style={{ 
             width: width, 
             height: height * 0.23, 

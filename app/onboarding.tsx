@@ -21,7 +21,7 @@ const { width, height } = Dimensions.get('window');
 const SLIDES = [
   {
     id: 1,
-    image: require('../assets/images/pusaka_bahari_banner_1776493187345.png'),
+    image: require('../assets/images/pusaka_bahari_banner_1776493187345.jpg'),
     badge: '🏛️',
     title: 'Warisan\nRaja Ali Haji',
     subtitle: 'Jelajahi kekayaan peninggalan intelektual dan budaya dari ulama besar Kepulauan Riau',
@@ -29,7 +29,7 @@ const SLIDES = [
   },
   {
     id: 2,
-    image: require('../assets/images/naskah_gurindam_1776493215711.png'),
+    image: require('../assets/images/naskah_gurindam_1776493215711.jpg'),
     badge: '📜',
     title: 'Naskah &\nArtefak Bersejarah',
     subtitle: 'Temukan Gurindam Dua Belas, Tuhfat al-Nafis, dan ratusan catatan berharga yang terdigitalisasi',
@@ -37,7 +37,7 @@ const SLIDES = [
   },
   {
     id: 3,
-    image: require('../assets/images/masjid_penyengat_1776493242751.png'),
+    image: require('../assets/images/masjid_penyengat_1776493242751.jpg'),
     badge: '🗺️',
     title: 'Situs &\nLokasi Sejarah',
     subtitle: 'Navigasi ke situs-situs bersejarah Pulau Penyengat langsung dari genggaman tangan Anda',

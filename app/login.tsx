@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import * as Linking from 'expo-linking';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -94,6 +96,34 @@ export default function LoginScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setErrorMsg('Silakan masukkan alamat email Anda untuk mereset kata sandi.');
+      return;
+    }
+    setIsLoading(true);
+    setErrorMsg('');
+    
+    // Gunakan expo-linking untuk membuat link yang akan membuka kembali aplikasi ini.
+    // Di Expo Go akan menjadi exp://..., di APK akan menjadi mobileproject://reset-password
+    const redirectUrl = Linking.createURL('reset-password');
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirectUrl,
+    });
+    
+    setIsLoading(false);
+    if (error) {
+      setErrorMsg(translateError(error.message));
+    } else {
+      Alert.alert(
+        'Email Terkirim',
+        'Tautan reset kata sandi telah dikirim. Silakan periksa email Anda.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   const handleGuest = () => {
     router.replace('/(tabs)');
   };
@@ -104,6 +134,7 @@ export default function LoginScreen() {
     if (error.includes('User already registered')) return 'Email ini sudah terdaftar. Silakan masuk.';
     if (error.includes('Password should be')) return 'Kata sandi terlalu lemah.';
     if (error.includes('Unable to validate email')) return 'Format email tidak valid.';
+    if (error.includes('User not found')) return 'Email tidak terdaftar di sistem kami.';
     return error;
   };
 
@@ -118,7 +149,7 @@ export default function LoginScreen() {
           {/* Cover Image */}
           <Animated.View entering={FadeIn.duration(800)} style={styles.imageWrap}>
             <Image
-              source={require('../assets/images/masjid_penyengat_1776493242751.png')}
+              source={require('../assets/images/masjid_penyengat_1776493242751.jpg')}
               style={styles.coverImage}
             />
             <View style={styles.imageOverlay} />
@@ -226,7 +257,7 @@ export default function LoginScreen() {
               )}
 
               {activeTab === 'login' && (
-                <TouchableOpacity style={styles.forgotBtn}>
+                <TouchableOpacity style={styles.forgotBtn} onPress={handleForgotPassword}>
                   <Text style={styles.forgotText}>Lupa kata sandi?</Text>
                 </TouchableOpacity>
               )}
