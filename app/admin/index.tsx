@@ -546,7 +546,7 @@ export default function AdminPanel() {
       <View style={styles.listCardBody}>{renderItemMeta(item)}</View>
       <View style={styles.listCardActions}>
         <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(item)}>
-          <Feather name="edit-2" size={15} color="#3b82f6" />
+          <Feather name="edit-2" size={15} color="#8B5E3C" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
           <Feather name="trash-2" size={15} color="#ef4444" />
@@ -723,16 +723,16 @@ export default function AdminPanel() {
                     <Text style={styles.galleryItemTitle} numberOfLines={1}>{item.title}</Text>
                     {item.audio_url && (
                       <View style={styles.audioIndicator}>
-                        <Feather name="headphones" size={10} color="#3b82f6" />
+                        <Feather name="headphones" size={10} color="#8B5E3C" />
                         <Text style={styles.audioIndicatorText}>Audio</Text>
                       </View>
                     )}
                     <View style={{ flexDirection: 'row', position: 'absolute', top: 6, right: 6, gap: 4 }}>
                       <TouchableOpacity
-                        style={[styles.galleryDeleteBtn, { backgroundColor: '#dbeafe', right: undefined, position: 'relative' }]}
+                        style={[styles.galleryDeleteBtn, { backgroundColor: '#fdf4eb', right: undefined, position: 'relative' }]}
                         onPress={() => editGalleryItem(item)}
                       >
-                        <Feather name="edit-2" size={12} color="#3b82f6" />
+                        <Feather name="edit-2" size={12} color="#8B5E3C" />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.galleryDeleteBtn, { position: 'relative' }]}
@@ -753,8 +753,8 @@ export default function AdminPanel() {
 
             {/* Edit Gallery Item Form */}
             {editingGalleryItem ? (
-              <View style={{ backgroundColor: '#eff6ff', padding: 16, borderRadius: 16, marginTop: 12, borderWidth: 1, borderColor: '#bfdbfe' }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1e40af', marginBottom: 12 }}>
+              <View style={{ backgroundColor: '#fdf4eb', padding: 16, borderRadius: 16, marginTop: 12, borderWidth: 1, borderColor: '#e8cdb5' }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#6b3a1f', marginBottom: 12 }}>
                   ✏️ Edit {editingGalleryItem.audio_url ? 'Audio' : 'Foto'}
                 </Text>
                 
@@ -763,16 +763,16 @@ export default function AdminPanel() {
                     <Image source={{ uri: editingGalleryItem.newImageUri || editingGalleryItem.image_url }} style={{ width: '100%', height: 120, borderRadius: 10, marginBottom: 8 }} resizeMode="cover" />
                     <TouchableOpacity 
                       onPress={replaceGalleryImage}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 10, backgroundColor: '#dbeafe', marginBottom: 12 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 10, backgroundColor: '#fdf4eb', marginBottom: 12 }}
                     >
-                      <Feather name="refresh-cw" size={14} color="#3b82f6" />
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#3b82f6' }}>Ganti Foto</Text>
+                      <Feather name="refresh-cw" size={14} color="#8B5E3C" />
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#8B5E3C' }}>Ganti Foto</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <View style={{ width: '100%', height: 50, borderRadius: 10, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center', marginBottom: 12, flexDirection: 'row', gap: 8 }}>
-                    <Feather name="music" size={16} color="#3b82f6" />
-                    <Text style={{ fontSize: 13, color: '#1e40af', fontWeight: '600' }}>File Audio</Text>
+                  <View style={{ width: '100%', height: 50, borderRadius: 10, backgroundColor: '#fdf4eb', alignItems: 'center', justifyContent: 'center', marginBottom: 12, flexDirection: 'row', gap: 8 }}>
+                    <Feather name="music" size={16} color="#8B5E3C" />
+                    <Text style={{ fontSize: 13, color: '#6b3a1f', fontWeight: '600' }}>File Audio</Text>
                   </View>
                 )}
 
@@ -817,7 +817,7 @@ export default function AdminPanel() {
                     <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Batal</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#3b82f6', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#8B5E3C', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
                     onPress={() => updateGalleryItem(editingItem.id)}
                     disabled={uploadingGalleryItem}
                   >
@@ -895,7 +895,7 @@ export default function AdminPanel() {
                     <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Batal</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
-                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#3b82f6', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#8B5E3C', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
                     onPress={() => submitPendingGalleryItem(editingItem.id)}
                     disabled={uploadingGalleryItem}
                   >
@@ -924,12 +924,12 @@ export default function AdminPanel() {
 
                 {/* Add audio button */}
                 <TouchableOpacity
-                  style={[styles.addGalleryBtn, { borderColor: '#3b82f6', marginTop: 8 }]}
+                  style={[styles.addGalleryBtn, { borderColor: '#8B5E3C', marginTop: 8 }]}
                   onPress={addAudioItemForArtifact}
                   activeOpacity={0.8}
                 >
-                  <Feather name="music" size={18} color="#3b82f6" />
-                  <Text style={[styles.addGalleryBtnText, { color: '#3b82f6' }]}>Tambah Audio/Syair</Text>
+                  <Feather name="music" size={18} color="#8B5E3C" />
+                  <Text style={[styles.addGalleryBtnText, { color: '#8B5E3C' }]}>Tambah Audio/Syair</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -1230,7 +1230,7 @@ const styles = StyleSheet.create({
   galleryItemImg: { width: '100%', height: 80, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   galleryItemTitle: { fontSize: 10, fontWeight: '600', color: '#0f172a', paddingHorizontal: 6, paddingVertical: 4 },
   audioIndicator: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingBottom: 4 },
-  audioIndicatorText: { fontSize: 9, color: '#3b82f6', fontWeight: '600' },
+  audioIndicatorText: { fontSize: 9, color: '#8B5E3C', fontWeight: '600' },
   galleryDeleteBtn: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
   galleryEmpty: { alignItems: 'center', padding: 24, gap: 8, backgroundColor: '#f8fafc', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginTop: 8 },
   galleryEmptyText: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },

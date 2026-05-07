@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   cardDateMonth: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#3b82f6',
+    color: '#8B5E3C',
     marginTop: 2,
   },
   cardContent: {

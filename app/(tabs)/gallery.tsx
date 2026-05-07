@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
+import ImageViewing from 'react-native-image-viewing';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ export default function GalleryScreen() {
   // Eksplorasi Mendalam
   const [artifactsData, setArtifactsData] = useState<any[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
+  const [zoomImageUri, setZoomImageUri] = useState<string | null>(null);
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -112,11 +114,11 @@ export default function GalleryScreen() {
     try {
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: track.audioUrl },
-        { shouldPlay: true },
+        { shouldPlay: false },
         onPlaybackStatusUpdate
       );
       setSound(newSound);
-      setIsPlaying(true);
+      setIsPlaying(false);
     } catch (e) {
       console.log('Error playing audio', e);
     }
@@ -148,6 +150,27 @@ export default function GalleryScreen() {
   useEffect(() => {
     return sound ? () => { sound.unloadAsync(); } : undefined;
   }, [sound]);
+
+  // Gunakan ref untuk state terbaru di cleanup useFocusEffect
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const isPlayingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    soundRef.current = sound;
+    isPlayingRef.current = isPlaying;
+  }, [sound, isPlaying]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Pause audio saat screen blur (pindah tab)
+      return () => {
+        if (soundRef.current && isPlayingRef.current) {
+          soundRef.current.pauseAsync().catch(() => {});
+          setIsPlaying(false);
+        }
+      };
+    }, [])
+  );
 
   const formatTime = (millis: number) => {
     const totalSeconds = Math.floor(millis / 1000);
@@ -288,9 +311,10 @@ export default function GalleryScreen() {
                   <Feather name="chevron-left" size={22} color="#ffffff" />
                 </TouchableOpacity>
                 <TouchableOpacity 
+                  onPress={() => setZoomImageUri(selectedPhoto.image_url)}
                   style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
                 >
-                  <Feather name="bookmark" size={20} color="#ffffff" />
+                  <Feather name="zoom-in" size={20} color="#ffffff" />
                 </TouchableOpacity>
               </View>
             </SafeAreaView>
@@ -339,19 +363,40 @@ export default function GalleryScreen() {
                   </Text>
                 </View>
 
-                {/* Close Button */}
-                <TouchableOpacity 
-                  onPress={() => setSelectedPhoto(null)} 
-                  style={styles.photoCloseBtn}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Tutup</Text>
-                </TouchableOpacity>
+                {/* Action Buttons */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+                  <TouchableOpacity 
+                    onPress={() => setZoomImageUri(selectedPhoto.image_url)} 
+                    style={[styles.photoCloseBtn, { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="zoom-in" size={16} color="#ffffff" />
+                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Perbesar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => setSelectedPhoto(null)} 
+                    style={[styles.photoCloseBtn, { flex: 1 }]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Tutup</Text>
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
             </View>
           </View>
         </Modal>
       )}
+
+      {/* Zoom Lightbox */}
+      <ImageViewing
+        images={zoomImageUri ? [{ uri: zoomImageUri }] : []}
+        imageIndex={0}
+        visible={!!zoomImageUri}
+        onRequestClose={() => setZoomImageUri(null)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+        backgroundColor="rgba(0, 0, 0, 0.95)"
+      />
 
       {/* SPOTIFY-STYLE MUSIC PLAYER MODAL */}
       <Modal visible={showPlayer} animationType="slide" presentationStyle="fullScreen">

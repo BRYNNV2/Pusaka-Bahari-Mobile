@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
+import { Platform, View, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   return (
@@ -11,17 +11,18 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
-          borderTopColor: '#e2e8f0',
-          height: Platform.OS === 'ios' ? 88 : 68,
+          borderTopColor: '#f1f0ee',
+          height: Platform.OS === 'ios' ? 92 : 72,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
           paddingTop: 10,
-          elevation: 10, // Shadow for Android
-          shadowColor: '#000', // Shadow for iOS
+          paddingHorizontal: 8,
+          elevation: 10,
+          shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
         },
-        tabBarActiveTintColor: '#0f172a',
+        tabBarActiveTintColor: '#3c2415',
         tabBarInactiveTintColor: '#94a3b8',
         tabBarLabelStyle: {
           fontSize: 11,
@@ -35,8 +36,10 @@ export default function TabLayout() {
         options={{ 
           title: 'Beranda',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
-          )
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Ionicons name={focused ? "home" : "home-outline"} size={20} color={focused ? '#c8956c' : color} />
+            </View>
+          ),
         }} 
       />
       <Tabs.Screen 
@@ -44,8 +47,10 @@ export default function TabLayout() {
         options={{ 
           title: 'Peta',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "map" : "map-outline"} size={24} color={color} />
-          )
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Ionicons name={focused ? "map" : "map-outline"} size={20} color={focused ? '#c8956c' : color} />
+            </View>
+          ),
         }} 
       />
       <Tabs.Screen 
@@ -53,8 +58,10 @@ export default function TabLayout() {
         options={{ 
           title: 'Galeri',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "images" : "images-outline"} size={24} color={color} />
-          )
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Ionicons name={focused ? "images" : "images-outline"} size={20} color={focused ? '#c8956c' : color} />
+            </View>
+          ),
         }} 
       />
       <Tabs.Screen 
@@ -62,10 +69,25 @@ export default function TabLayout() {
         options={{ 
           title: 'Katalog',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "book" : "book-outline"} size={24} color={color} />
-          )
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Ionicons name={focused ? "book" : "book-outline"} size={20} color={focused ? '#c8956c' : color} />
+            </View>
+          ),
         }} 
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconWrap: {
+    width: 42,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapActive: {
+    backgroundColor: '#3c2415',
+  },
+});

@@ -24,6 +24,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageViewing from 'react-native-image-viewing';
+import MapView, { Marker } from 'react-native-maps';
 
 const { width, height } = Dimensions.get('window');
 
@@ -48,6 +49,66 @@ export default function ArtifactDetailScreen() {
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded]   = useState(false);
+
+  // Player State
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [activeTrack, setActiveTrack] = useState<any | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [positionMillis, setPositionMillis] = useState(0);
+  const [durationMillis, setDurationMillis] = useState(0);
+  const [isExpandedPlayer, setIsExpandedPlayer] = useState(false);
+  const [playerTab, setPlayerTab] = useState<'next' | 'lyrics' | 'related'>('lyrics');
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const isPlayingRef = useRef<boolean>(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    soundRef.current = sound;
+    isPlayingRef.current = isPlaying;
+  }, [sound, isPlaying]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (soundRef.current && isPlayingRef.current) {
+          soundRef.current.pauseAsync().catch(() => {});
+          setIsPlaying(false);
+        }
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    return sound ? () => { sound.unloadAsync(); } : undefined;
+  }, [sound]);
+
+  let activeLyricIndex = -1;
+  if (activeTrack?.lyrics) {
+    for (let i = activeTrack.lyrics.length - 1; i >= 0; i--) {
+      if (positionMillis >= activeTrack.lyrics[i].time) {
+        activeLyricIndex = i;
+        break;
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (showPlayer && scrollViewRef.current && activeLyricIndex >= 0) {
+      scrollViewRef.current.scrollTo({ 
+        y: Math.max(0, (activeLyricIndex * 42) - 60), 
+        animated: true 
+      });
+    }
+  }, [activeLyricIndex, showPlayer, isExpandedPlayer, playerTab]);
+
+  const progressPercent = durationMillis > 0 ? Math.min((positionMillis / durationMillis) * 100, 100) : 0;
+
+  const openExpandedView = (tab: 'next' | 'lyrics' | 'related') => {
+    setPlayerTab(tab);
+    setIsExpandedPlayer(true);
+  };
 
   // Image Viewer State
   const [isImageViewVisible, setIsImageViewVisible] = useState(false);
@@ -111,7 +172,7 @@ export default function ArtifactDetailScreen() {
       Alert.alert('Lokasi Belum Tersedia', 'Koordinat untuk artefak ini belum ditambahkan oleh admin.');
       return;
     }
-    const url = `https://www.google.com/maps/search/?api=1&query=${artifact.latitude},${artifact.longitude}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${artifact.latitude},${artifact.longitude}`;
     Linking.openURL(url);
   };
 
@@ -145,6 +206,74 @@ export default function ArtifactDetailScreen() {
   const galleryPhotos = gallery.filter(g => g.image_url);
   const audioItems = gallery.filter(g => g.audio_url);
 
+  const playlist = audioItems.map(item => ({
+    id: item.id,
+    artifactId: item.artifact_id,
+    title: item.title || artifact.name || 'Audio Tanpa Judul',
+    desc: item.description || artifact.description || 'Tidak ada deskripsi',
+    audioUrl: item.audio_url,
+    img: item.image_url ? { uri: item.image_url } : (artifact.image_url ? { uri: artifact.image_url } : FALLBACK_IMAGE),
+    lyrics: item.lyrics 
+         ? item.lyrics.split('\n').map((line: string, i: number) => ({ time: i * 3500, text: line })) 
+         : [
+             { time: 0, text: "(Pemutaran Audio Dimulai...)" },
+             { time: 999999, text: "Lirik belum tersedia untuk audio ini." }
+           ]
+  }));
+
+  const playTrack = async (track: any) => {
+    if (sound) {
+      await sound.unloadAsync();
+      setSound(null);
+    }
+    setActiveTrack(track);
+    setShowPlayer(true);
+    setPositionMillis(0);
+    setIsPlaying(false);
+
+    try {
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: track.audioUrl },
+        { shouldPlay: false },
+        onPlaybackStatusUpdate
+      );
+      setSound(newSound);
+      setIsPlaying(false);
+    } catch (e) {
+      console.log('Error playing audio', e);
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setPositionMillis(status.positionMillis);
+      if (status.durationMillis) {
+        setDurationMillis(status.durationMillis);
+      }
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  const togglePlayPause = async () => {
+    if (!sound) return;
+    if (isPlaying) {
+      await sound.pauseAsync();
+      setIsPlaying(false);
+    } else {
+      await sound.playAsync();
+      setIsPlaying(true);
+    }
+  };
+
+  const formatTime = (millis: number) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
   // Format images for ImageViewing
   const formattedImages = galleryPhotos.map(photo => ({ uri: photo.image_url }));
 
@@ -160,7 +289,7 @@ export default function ArtifactDetailScreen() {
       isOpenNow = true;
     } else if (artifact.type === 'Bangunan') {
       openStatusText = "Buka Mengikuti Jadwal Operasional";
-      statusColor = "#3b82f6"; // Blue
+      statusColor = "#8B5E3C"; // Brown
     }
   } else {
     // Parser Waktu Real-time (ala Google Maps)
@@ -209,7 +338,7 @@ export default function ArtifactDetailScreen() {
         showsVerticalScrollIndicator={false} 
         bounces={true}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" colors={['#0088CC']} progressViewOffset={40} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" colors={['#8B5E3C']} progressViewOffset={40} />
         }
       >
         {/* ── Hero Image ── */}
@@ -239,6 +368,9 @@ export default function ArtifactDetailScreen() {
               <Feather name="arrow-left" size={20} color="#0f172a" />
             </TouchableOpacity>
             <View style={styles.floatRight}>
+              <TouchableOpacity style={styles.floatBtn} onPress={handleShare}>
+                <Feather name="share-2" size={20} color="#0f172a" />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.floatBtn}>
                 <Feather name="bookmark" size={20} color="#0f172a" />
               </TouchableOpacity>
@@ -286,26 +418,6 @@ export default function ArtifactDetailScreen() {
           {/* Divider */}
           <View style={styles.divider} />
 
-          {/* Premium Action Buttons */}
-          <View style={styles.modernActionRow}>
-            <TouchableOpacity style={styles.primaryAction} onPress={openMaps} activeOpacity={0.8}>
-              <Feather name="map-pin" size={18} color="#ffffff" />
-              <Text style={styles.primaryActionText}>Lihat di Peta</Text>
-            </TouchableOpacity>
-
-            <View style={styles.secondaryActions}>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/gallery')} activeOpacity={0.8}>
-                <Feather name="image" size={20} color="#0f172a" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={handleShare} activeOpacity={0.8}>
-                <Feather name="share-2" size={20} color="#0f172a" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Divider */}
-          <View style={styles.divider} />
-
           {/* Open Status */}
           <View style={styles.openStatusRow}>
             <View style={[styles.openDot, { backgroundColor: statusColor }]} />
@@ -339,6 +451,64 @@ export default function ArtifactDetailScreen() {
               <AttributeItem icon="map" label="Lokasi" value={artifact.latitude ? 'Koordinat Tersedia' : 'Belum ditandai'} />
             </View>
           </View>
+
+          {/* Audio / Syair Section */}
+          {audioItems.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🎵 Syair & Audio</Text>
+              <View style={{ marginBottom: 12 }}>
+                {playlist.map((item) => (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={styles.audioCardPlaylist}
+                    onPress={() => playTrack(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Image source={item.img} style={styles.audioThumb} />
+                    <View style={styles.audioInfo}>
+                      <Text style={styles.audioTitleText}>{item.title}</Text>
+                      <Text style={styles.audioDescText} numberOfLines={1}>{item.desc}</Text>
+                    </View>
+                    <View style={styles.playBtnSmall}>
+                      <Feather name="play" size={16} color="#0f172a" style={{ marginLeft: 2 }} />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Map Location */}
+          {artifact.latitude && artifact.longitude && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Peta Lokasi</Text>
+              <View style={styles.mapContainer}>
+                <MapView
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: Number(artifact.latitude),
+                    longitude: Number(artifact.longitude),
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                  }}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                >
+                  <Marker
+                    coordinate={{
+                      latitude: Number(artifact.latitude),
+                      longitude: Number(artifact.longitude),
+                    }}
+                    title={artifact.name}
+                  />
+                </MapView>
+                <TouchableOpacity style={styles.mapOverlayButton} onPress={openMaps} activeOpacity={0.8}>
+                  <Text style={styles.mapOverlayText}>Buka di Maps</Text>
+                  <Feather name="external-link" size={14} color="#0f172a" style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Photo Gallery */}
           {galleryPhotos.length > 0 && (
@@ -379,21 +549,6 @@ export default function ArtifactDetailScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
-          )}
-
-          {/* Audio / Syair Section */}
-          {audioItems.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🎵 Syair & Audio</Text>
-              {audioItems.map((item) => (
-                <AudioPlayerCard
-                  key={item.id}
-                  title={item.title}
-                  audioUrl={item.audio_url}
-                  imageUrl={item.image_url}
-                />
-              ))}
             </View>
           )}
 
@@ -543,6 +698,168 @@ export default function ArtifactDetailScreen() {
         doubleTapToZoomEnabled={true}
         backgroundColor="rgba(0, 0, 0, 0.9)"
       />
+
+      {/* SPOTIFY-STYLE MUSIC PLAYER MODAL */}
+      <Modal visible={showPlayer} animationType="slide" presentationStyle="fullScreen">
+        <LinearGradient colors={['#334155', '#0f172a']} style={styles.playerContainer}>
+          <SafeAreaView style={{flex: 1}}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.playerHeader}>
+                <TouchableOpacity onPress={() => setShowPlayer(false)} style={styles.closeBtn}>
+                  <Feather name="chevron-down" size={28} color="white" />
+                </TouchableOpacity>
+                <Text style={styles.playerHeaderText}>SEDANG DIPUTAR</Text>
+                <View style={{ width: 28 }} />
+              </View>
+
+              <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 20 }}>
+                <View style={styles.albumArtContainer}>
+                  <Image source={activeTrack?.img} style={styles.albumArtLarge} />
+                </View>
+
+                <View style={styles.titleContainer}>
+                  <Text style={styles.playerTitle}>{activeTrack?.title}</Text>
+                  <Text style={styles.playerDesc} numberOfLines={1}>{activeTrack?.desc}</Text>
+                </View>
+
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+                  </View>
+                  <View style={styles.timeContainer}>
+                    <Text style={styles.timeText}>{formatTime(positionMillis)}</Text>
+                    <Text style={styles.timeText}>{formatTime(durationMillis)}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.controlsContainer}>
+                  <TouchableOpacity>
+                    <Ionicons name="play-skip-back" size={32} color="white" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtnLarge}>
+                    <Ionicons name={isPlaying ? "pause" : "play"} size={40} color="#0f172a" style={!isPlaying ? {marginLeft: 4} : {}} />
+                  </TouchableOpacity>
+                  <TouchableOpacity>
+                    <Ionicons name="play-skip-forward" size={32} color="white" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.bottomNavContainer}>
+                <TouchableOpacity onPress={() => openExpandedView('next')} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={styles.bottomNavText}>Berikutnya</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => openExpandedView('lyrics')} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={[styles.bottomNavText, { color: 'white', fontWeight: 'bold' }]}>Lirik</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => openExpandedView('related')} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={styles.bottomNavText}>Terkait</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      </Modal>
+
+      {/* --- MODAL LIRIK FULL SCREEN (Animasi Slide Halus) --- */}
+      <Modal visible={isExpandedPlayer} animationType="slide" presentationStyle="fullScreen">
+        <LinearGradient colors={['#1e293b', '#0f172a']} style={{ flex: 1 }}>
+          <SafeAreaView style={{ flex: 1 }}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.expandedHeader}>
+                <TouchableOpacity onPress={() => setIsExpandedPlayer(false)} style={{ paddingRight: 16 }}>
+                  <Feather name="chevron-down" size={28} color="white" />
+                </TouchableOpacity>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                  <Image source={activeTrack?.img} style={{ width: 44, height: 44, borderRadius: 6 }} />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }} numberOfLines={1}>{activeTrack?.title}</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }} numberOfLines={1}>{activeTrack?.desc}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={togglePlayPause} style={{ paddingLeft: 16 }}>
+                  <Ionicons name={isPlaying ? "pause" : "play"} size={32} color="white" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.expandedTabs}>
+                {(['next', 'lyrics', 'related'] as const).map(tab => (
+                  <TouchableOpacity 
+                    key={tab} 
+                    onPress={() => setPlayerTab(tab)} 
+                    style={[styles.expandedTab, playerTab === tab && styles.expandedTabActive]}
+                  >
+                    <Text style={[styles.expandedTabText, playerTab === tab && styles.expandedTabTextActive]}>
+                      {tab === 'next' ? 'Berikutnya' : tab === 'lyrics' ? 'Lirik' : 'Terkait'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.expandedContent}>
+                {playerTab === 'lyrics' && (
+                  <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                    {activeTrack?.lyrics?.map((lyric: any, index: number) => {
+                      const isActive = index === activeLyricIndex;
+                      return (
+                        <Text key={index} style={[styles.lyricText, isActive && styles.lyricTextActive, { textAlign: 'left' }]}>
+                          {lyric.text}
+                        </Text>
+                      );
+                    })}
+                  </ScrollView>
+                )}
+
+                {playerTab === 'next' && (
+                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+                    {playlist.slice(playlist.findIndex(p => p.id === activeTrack?.id) + 1).map(item => (
+                      <TouchableOpacity 
+                        key={item.id} 
+                        style={[styles.audioCardPlaylist, { borderBottomColor: 'rgba(255,255,255,0.1)' }]} 
+                        onPress={() => { playTrack(item); setIsExpandedPlayer(false); }}
+                      >
+                        <Image source={item.img} style={styles.audioThumb} />
+                        <View style={styles.audioInfo}>
+                          <Text style={[styles.audioTitleText, { color: 'white' }]}>{item.title}</Text>
+                          <Text style={[styles.audioDescText, { color: 'rgba(255,255,255,0.6)' }]}>{item.desc}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                    {playlist.findIndex(p => p.id === activeTrack?.id) === playlist.length - 1 && (
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 40, fontStyle: 'italic' }}>
+                        Ini adalah lagu terakhir di putaran.
+                      </Text>
+                    )}
+                  </ScrollView>
+                )}
+
+                {playerTab === 'related' && (
+                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+                    {playlist.filter(p => p.artifactId === activeTrack?.artifactId && p.id !== activeTrack?.id).map(item => (
+                      <TouchableOpacity 
+                        key={item.id} 
+                        style={[styles.audioCardPlaylist, { borderBottomColor: 'rgba(255,255,255,0.1)' }]} 
+                        onPress={() => { playTrack(item); setIsExpandedPlayer(false); }}
+                      >
+                        <Image source={item.img} style={styles.audioThumb} />
+                        <View style={styles.audioInfo}>
+                          <Text style={[styles.audioTitleText, { color: 'white' }]}>{item.title}</Text>
+                          <Text style={[styles.audioDescText, { color: 'rgba(255,255,255,0.6)' }]}>{item.desc}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                    {playlist.filter(p => p.artifactId === activeTrack?.artifactId && p.id !== activeTrack?.id).length === 0 && (
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 40, fontStyle: 'italic' }}>
+                        Tidak ada audio lain yang terkait dari artefak yang sama.
+                      </Text>
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      </Modal>
     </View>
   );
 }
@@ -556,63 +873,6 @@ function AttributeItem({ icon, label, value }: { icon: any; label: string; value
       </View>
       <Text style={styles.attributeLabel}>{label}</Text>
       <Text style={styles.attributeValue}>{value}</Text>
-    </View>
-  );
-}
-
-function AudioPlayerCard({ title, audioUrl, imageUrl }: { title: string; audioUrl: string; imageUrl?: string }) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  async function togglePlay() {
-    if (sound) {
-      if (isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
-      } else {
-        await sound.playAsync();
-        setIsPlaying(true);
-      }
-      return;
-    }
-    try {
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: true }
-      );
-      setSound(newSound);
-      setIsPlaying(true);
-      newSound.setOnPlaybackStatusUpdate((status: any) => {
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-          newSound.setPositionAsync(0);
-        }
-      });
-    } catch (e) {
-      console.log('Error playing audio', e);
-    }
-  }
-
-  useEffect(() => {
-    return sound ? () => { sound.unloadAsync(); } : undefined;
-  }, [sound]);
-
-  return (
-    <View style={styles.audioCard}>
-      {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.audioCardImg} resizeMode="cover" />
-      ) : (
-        <View style={[styles.audioCardImg, { backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }]}>
-          <Feather name="music" size={20} color="#94a3b8" />
-        </View>
-      )}
-      <View style={styles.audioCardInfo}>
-        <Text style={styles.audioCardTitle} numberOfLines={1}>{title}</Text>
-        <Text style={styles.audioCardSub}>Ketuk untuk {isPlaying ? 'jeda' : 'putar'}</Text>
-      </View>
-      <TouchableOpacity style={styles.audioPlayBtn} onPress={togglePlay}>
-        <Feather name={isPlaying ? 'pause' : 'play'} size={16} color="#0f172a" style={isPlaying ? {} : { marginLeft: 2 }} />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -678,6 +938,42 @@ const styles = StyleSheet.create({
   attributeIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
   attributeLabel:  { fontSize: 11, color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' },
   attributeValue:  { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+
+  // Map
+  mapContainer: {
+    height: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#f1f5f9',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  mapOverlayButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapOverlayText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
 
   // Gallery
   galleryCard: {
@@ -779,4 +1075,39 @@ const styles = StyleSheet.create({
     height: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
+
+  // Player Modal Styles
+  playerContainer: { flex: 1 },
+  playerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 20 : 10, marginBottom: 20 },
+  closeBtn: { padding: 4 },
+  playerHeaderText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
+  albumArtContainer: { alignItems: 'center', marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 25 }, shadowOpacity: 0.6, shadowRadius: 35, elevation: 25 },
+  albumArtLarge: { width: Math.min(width - 48, height * 0.35), height: Math.min(width - 48, height * 0.35), borderRadius: 20 },
+  titleContainer: { paddingHorizontal: 30, marginBottom: 20 },
+  playerTitle: { fontSize: 24, fontWeight: '800', color: 'white', marginBottom: 8 },
+  playerDesc: { fontSize: 16, color: 'rgba(255,255,255,0.6)' },
+  progressContainer: { paddingHorizontal: 30, marginBottom: 20 },
+  progressBarBg: { height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2, marginBottom: 12 },
+  progressBarFill: { height: '100%', backgroundColor: 'white', borderRadius: 2 },
+  timeContainer: { flexDirection: 'row', justifyContent: 'space-between' },
+  timeText: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '500' },
+  controlsContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 40, marginBottom: 20 },
+  playPauseBtnLarge: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
+  bottomNavContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 40, paddingBottom: Platform.OS === 'ios' ? 20 : 30 },
+  bottomNavText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600' },
+  lyricText: { color: 'rgba(255,255,255,0.4)', fontSize: 22, fontWeight: '600', lineHeight: 38, marginBottom: 20 },
+  lyricTextActive: { color: 'white', fontSize: 28, fontWeight: '800', opacity: 1 },
+  expandedHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: Platform.OS === 'android' ? 24 : 12, marginBottom: 20 },
+  expandedTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', marginBottom: 24, paddingHorizontal: 24 },
+  expandedTab: { marginRight: 32, paddingVertical: 12 },
+  expandedTabActive: { borderBottomWidth: 3, borderBottomColor: 'white' },
+  expandedTabText: { color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '600' },
+  expandedTabTextActive: { color: 'white', fontWeight: '700' },
+  expandedContent: { flex: 1, paddingHorizontal: 24 },
+  audioCardPlaylist: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  audioThumb: { width: 60, height: 60, borderRadius: 8 },
+  audioInfo: { flex: 1, paddingHorizontal: 16 },
+  audioTitleText: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 4 },
+  audioDescText: { fontSize: 14, color: '#64748b', lineHeight: 20 },
+  playBtnSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
 });

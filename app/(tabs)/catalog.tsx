@@ -64,7 +64,7 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
-  'Naskah':  { bg: '#eff6ff', text: '#3b82f6', icon: 'book' },
+  'Naskah':  { bg: '#fdf4eb', text: '#8B5E3C', icon: 'book' },
   'Monumen': { bg: '#ecfdf5', text: '#059669', icon: 'map-pin' },
   'Benda':   { bg: '#fff7ed', text: '#ea580c', icon: 'archive' },
   'Tradisi': { bg: '#f5f3ff', text: '#8b5cf6', icon: 'anchor' },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
   },
   categoryPillActive: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#3c2415',
   },
   categoryText: {
     fontSize: 14,
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   },
   year: {
     fontSize: 12,
-    color: '#3b82f6',
+    color: '#8B5E3C',
     fontWeight: '600',
     marginBottom: 6,
   },
@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
   kamusLetter: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#3b82f6',
+    color: '#8B5E3C',
   },
   kamusContent: {
     flex: 1,

@@ -38,6 +38,13 @@ export default function HomeScreen() {
   }, []);
 
   const categories = ['Semua', 'Artefak', 'Naskah', 'Monumen', 'Benda'];
+  const CATEGORY_ICONS: Record<string, { lib: 'feather' | 'material' | 'ionicons'; name: string } | null> = {
+    Semua: null,
+    Artefak: { lib: 'material', name: 'shape-outline' },
+    Naskah: { lib: 'feather', name: 'feather' },
+    Monumen: { lib: 'material', name: 'bank' },
+    Benda: { lib: 'feather', name: 'box' },
+  };
   const [activeCategory, setActiveCategory] = useState('Semua');
 
   const [artifactsData, setArtifactsData] = useState<any[]>([]);
@@ -122,7 +129,7 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false} 
           contentContainerStyle={styles.scrollContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0088CC" colors={['#0088CC']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B5E3C" colors={['#8B5E3C']} />
           }
         >
           
@@ -295,6 +302,8 @@ export default function HomeScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
             {categories.map((item, index) => {
               const isActive = activeCategory === item;
+              const iconConfig = CATEGORY_ICONS[item];
+              const iconColor = isActive ? '#ffffff' : '#5c4033';
               return (
                 <TouchableOpacity 
                   key={index} 
@@ -302,6 +311,15 @@ export default function HomeScreen() {
                   onPress={() => setActiveCategory(item)}
                   activeOpacity={0.8}
                 >
+                  {iconConfig && (
+                    iconConfig.lib === 'feather' ? (
+                      <Feather name={iconConfig.name as any} size={14} color={iconColor} />
+                    ) : iconConfig.lib === 'material' ? (
+                      <MaterialCommunityIcons name={iconConfig.name as any} size={14} color={iconColor} />
+                    ) : (
+                      <Ionicons name={iconConfig.name as any} size={14} color={iconColor} />
+                    )
+                  )}
                   <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>{item}</Text>
                 </TouchableOpacity>
               );
@@ -436,7 +454,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#c8956c',
     borderWidth: 1,
     borderColor: '#ffffff',
   },
@@ -555,7 +573,7 @@ const styles = StyleSheet.create({
   quickMenuSeeAll: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3b82f6',
+    color: '#8B5E3C',
   },
   agendaSectionWrapper: {
     marginBottom: 20,
@@ -597,7 +615,7 @@ const styles = StyleSheet.create({
   agendaMonthMini: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#3b82f6',
+    color: '#8B5E3C',
     marginTop: 1,
   },
   agendaContentMini: {
@@ -615,17 +633,23 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   categoryPill: {
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
     paddingVertical: 10,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 20,
+    backgroundColor: '#f5f0eb',
+    borderRadius: 22,
     marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#e8ddd2',
   },
   categoryPillActive: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#3c2415',
+    borderColor: '#3c2415',
   },
   categoryText: {
-    color: '#64748b',
+    color: '#5c4033',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -671,7 +695,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   verifiedBadge: {
-    backgroundColor: '#3b82f6', // Trusted blue badge
+    backgroundColor: '#8B5E3C', // Warm brown badge
     width: 24,
     height: 24,
     borderRadius: 12,
