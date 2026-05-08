@@ -100,6 +100,16 @@ export default function AdminPanel() {
   const [agTitle, setAgTitle] = useState('');
   const [agDesc,  setAgDesc]  = useState('');
   const [agDate,  setAgDate]  = useState('');
+  // Musics
+  const [mTitle, setMTitle] = useState('');
+  const [mDesc, setMDesc] = useState('');
+  const [mAudioUrl, setMAudioUrl] = useState<string | null>(null);
+  const [mAudioUri, setMAudioUri] = useState<string | null>(null);
+  const [mImageUrl, setMImageUrl] = useState<string | null>(null);
+  const [mImageUri, setMImageUri] = useState<string | null>(null);
+  const [mLyrics, setMLyrics] = useState('');
+  const [uploadingMImg, setUploadingMImg] = useState(false);
+  const [uploadingMAudio, setUploadingMAudio] = useState(false);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const currentTab = TABS.find(t => t.id === activeTab)!;
@@ -308,6 +318,7 @@ export default function AdminPanel() {
     setLTitle(''); setLDesc(''); setLLat(''); setLLng('');
     setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null); setGLyrics('');
     setAgTitle(''); setAgDesc(''); setAgDate('');
+    setMTitle(''); setMDesc(''); setMAudioUrl(null); setMAudioUri(null); setMImageUrl(null); setMImageUri(null); setMLyrics('');
     setEditingItem(null);
   };
 
@@ -468,6 +479,29 @@ export default function AdminPanel() {
     if (error) {
       Alert.alert('Gagal menyimpan', error.message);
     } else {
+      // Auto-insert notifikasi untuk data baru (bukan edit)
+      if (!editingItem) {
+        const notifTitle = formData.name || formData.title || 'Data Baru';
+        const notifTypeMap: Record<string, string> = {
+          artifacts: 'artifact',
+          catalogs: 'catalog',
+          locations: 'info',
+          gallery: 'info',
+          agenda: 'agenda',
+        };
+        const notifMessageMap: Record<string, string> = {
+          artifacts: `Artefak baru "${notifTitle}" telah ditambahkan ke koleksi.`,
+          catalogs: `Katalog baru "${notifTitle}" telah tersedia.`,
+          locations: `Lokasi baru "${notifTitle}" telah ditandai.`,
+          gallery: `Media galeri baru "${notifTitle}" telah diunggah.`,
+          agenda: `Agenda baru "${notifTitle}" telah dijadwalkan.`,
+        };
+        await supabase.from('notifications').insert([{
+          title: `${activeTab === 'artifacts' ? '📜' : activeTab === 'agenda' ? '📅' : activeTab === 'catalogs' ? '📖' : activeTab === 'gallery' ? '🖼️' : '🔔'} ${notifTitle}`,
+          message: notifMessageMap[activeTab] || `Data baru telah ditambahkan.`,
+          type: notifTypeMap[activeTab] || 'info',
+        }]);
+      }
       setModalVisible(false);
       resetForm();
       fetchData();
@@ -981,8 +1015,44 @@ export default function AdminPanel() {
         </TouchableOpacity>
         {gImageUrl && <Text style={styles.imgSuccess}>✓ Foto berhasil diupload</Text>}
 
-        <Text style={styles.formLabel}>URL Audio</Text>
-        <TextInput style={styles.formInput} value={gAudio} onChangeText={setGAudio} placeholder="https://..." placeholderTextColor="#94a3b8" keyboardType="url" autoCapitalize="none" />
+        <Text style={styles.formLabel}>File Audio (MP3)</Text>
+        <TouchableOpacity
+          style={[styles.imgPicker, { minHeight: 60 }]}
+          activeOpacity={0.8}
+          onPress={async () => {
+            try {
+              const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
+              if (res.canceled || !res.assets[0]) return;
+              setUploadingGImg(true);
+              const uri = res.assets[0].uri;
+              const ext = res.assets[0].name.split('.').pop()?.toLowerCase() || 'mp3';
+              const path = `gallery_audio/${Date.now()}.${ext}`;
+              const formData = new FormData();
+              formData.append('files', {
+                uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+                name: `audio_${Date.now()}.${ext}`,
+                type: `audio/${ext}`,
+              } as any);
+              const { error } = await supabase.storage.from('gallery').upload(path, formData, { upsert: true });
+              if (error) throw error;
+              const { data } = supabase.storage.from('gallery').getPublicUrl(path);
+              setGAudio(data.publicUrl);
+              Alert.alert('Berhasil', 'Audio berhasil diunggah.');
+            } catch (e: any) {
+              Alert.alert('Gagal Upload Audio', e.message);
+            } finally {
+              setUploadingGImg(false);
+            }
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Feather name="music" size={20} color="#94a3b8" />
+            <Text style={{ color: '#64748b', flex: 1 }}>
+              {gAudio ? '✓ Audio sudah diunggah. Ketuk untuk ganti.' : 'Ketuk untuk pilih file audio'}
+            </Text>
+          </View>
+          {uploadingGImg && <ActivityIndicator color="#0f172a" style={{ position: 'absolute', right: 20 }} />}
+        </TouchableOpacity>
         
         <Text style={styles.formLabel}>Lirik / Teks Narasi (Opsional)</Text>
         <TextInput style={[styles.formInput, styles.formTextarea]} value={gLyrics} onChangeText={setGLyrics} placeholder="Paste lirik di sini..." placeholderTextColor="#94a3b8" multiline numberOfLines={4} textAlignVertical="top" />

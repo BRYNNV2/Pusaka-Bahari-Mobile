@@ -14,6 +14,8 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Calendar from 'expo-calendar';
+import { Alert, Platform } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -73,11 +75,81 @@ export default function AgendaScreen() {
     }
   };
 
-  const renderAgendaItem = ({ item }: { item: AgendaItem }) => {
+  const AgendaCard = ({ item }: { item: AgendaItem }) => {
     const { day, month } = getDayAndMonth(item.event_date);
-    
+    const [timeLeft, setTimeLeft] = useState('');
+    const [isPast, setIsPast] = useState(false);
+
+    useEffect(() => {
+      const eventTime = new Date(item.event_date).getTime();
+
+      const updateCountdown = () => {
+        const now = new Date().getTime();
+        const diff = eventTime - now;
+
+        if (diff < 0) {
+          setIsPast(true);
+          setTimeLeft('Acara Telah Berakhir');
+          return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        if (days > 0) {
+          setTimeLeft(`${days} hari ${hours}j ${minutes}m ${seconds}d`);
+        } else {
+          setTimeLeft(`${hours}j ${minutes}m ${seconds}d`);
+        }
+      };
+
+      updateCountdown();
+      const timer = setInterval(updateCountdown, 1000);
+      return () => clearInterval(timer);
+    }, [item.event_date]);
+
+    const addToCalendar = async () => {
+      try {
+        const { status } = await Calendar.requestCalendarPermissionsAsync();
+        if (status === 'granted') {
+          const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+          let defaultCalendar = calendars.find(c => c.isPrimary);
+          if (!defaultCalendar && Platform.OS === 'ios') {
+            defaultCalendar = calendars.find(c => c.source.name === 'Default');
+          }
+          if (!defaultCalendar && calendars.length > 0) {
+            defaultCalendar = calendars[0];
+          }
+
+          if (defaultCalendar) {
+            const startDate = new Date(item.event_date);
+            const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Asumsi durasi 2 jam
+            
+            await Calendar.createEventAsync(defaultCalendar.id, {
+              title: item.title,
+              notes: item.description,
+              startDate,
+              endDate,
+              timeZone: 'Asia/Jakarta',
+              alarms: [{ relativeOffset: -60 }] // Ingatkan 1 jam sebelumnya
+            });
+            Alert.alert('Sukses', 'Agenda berhasil ditambahkan ke kalender perangkat Anda!');
+          } else {
+            Alert.alert('Gagal', 'Tidak menemukan kalender default di perangkat Anda.');
+          }
+        } else {
+          Alert.alert('Izin Ditolak', 'Aplikasi butuh izin untuk menyimpan acara ke kalender.');
+        }
+      } catch (error) {
+        console.log('Error adding to calendar', error);
+        Alert.alert('Error', 'Terjadi kesalahan saat menambahkan agenda ke kalender.');
+      }
+    };
+
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, isPast && { opacity: 0.6 }]}>
         <View style={styles.cardDateBox}>
           <Text style={styles.cardDateDay}>{day}</Text>
           <Text style={styles.cardDateMonth}>{month.toUpperCase()}</Text>
@@ -87,13 +159,25 @@ export default function AgendaScreen() {
           <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
           
           <View style={styles.cardFooter}>
-            <View style={styles.cardTimeRow}>
-              <Feather name="clock" size={14} color="#64748b" />
-              <Text style={styles.cardFooterText}>{formatDate(item.event_date)}</Text>
+            <View style={{ flex: 1 }}>
+              <View style={styles.cardTimeRow}>
+                <Feather name="clock" size={14} color="#64748b" />
+                <Text style={styles.cardFooterText}>{formatDate(item.event_date)}</Text>
+              </View>
+              <View style={[styles.cardTimeRow, { marginTop: 4 }]}>
+                <Ionicons name="timer-outline" size={14} color={isPast ? "#ef4444" : "#c8956c"} />
+                <Text style={[styles.cardFooterText, { color: isPast ? '#ef4444' : '#c8956c', fontWeight: 'bold' }]}>
+                  {timeLeft}
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity style={styles.actBtn}>
-              <Text style={styles.actBtnText}>Detail</Text>
-            </TouchableOpacity>
+
+            {!isPast && (
+              <TouchableOpacity style={styles.actBtn} onPress={addToCalendar}>
+                <Feather name="calendar" size={14} color="#fff" />
+                <Text style={styles.actBtnText}>Ingatkan</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -130,7 +214,7 @@ export default function AgendaScreen() {
         <FlatList
           data={data}
           keyExtractor={(item) => String(item.id)}
-          renderItem={renderAgendaItem}
+          renderItem={({ item }) => <AgendaCard item={item} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
@@ -284,12 +368,15 @@ const styles = StyleSheet.create({
   actBtn: {
     backgroundColor: '#0f172a',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   actBtnText: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
   emptyBox: {

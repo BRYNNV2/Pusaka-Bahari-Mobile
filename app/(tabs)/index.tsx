@@ -6,6 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 280;
@@ -53,6 +54,22 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [agendaData, setAgendaData] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const uid = user?.id || 'guest';
+      const lastRead = await AsyncStorage.getItem(`lastNotifRead_${uid}`);
+      let query = supabase.from('notifications').select('id', { count: 'exact', head: true });
+      if (lastRead) {
+        query = query.gt('created_at', lastRead);
+      }
+      const { count } = await query;
+      setUnreadCount(count || 0);
+    } catch (e) {
+      setUnreadCount(0);
+    }
+  };
 
   const getDayAndMonth = (dateString: string) => {
     if (!dateString) return { day: '-', month: '-' };
@@ -101,6 +118,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchAgendaFast();
+      fetchUnreadCount();
     }, [])
   );
 
@@ -145,9 +163,13 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.headerRightActions}>
-              <TouchableOpacity style={styles.bellBtn}>
+              <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
                 <Feather name="bell" size={20} color="#0f172a" />
-                <View style={styles.bellBadge} />
+                {unreadCount > 0 && (
+                  <View style={styles.bellBadge}>
+                    <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -449,14 +471,22 @@ const styles = StyleSheet.create({
   },
   bellBadge: {
     position: 'absolute',
-    top: 10,
-    right: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#c8956c',
-    borderWidth: 1,
+    top: 6,
+    right: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ef4444',
+    borderWidth: 2,
     borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  bellBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   avatarBtn: {
     width: 44,

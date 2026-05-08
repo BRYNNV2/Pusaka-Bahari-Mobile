@@ -57,8 +57,12 @@ export default function ArtifactDetailScreen() {
   const [positionMillis, setPositionMillis] = useState(0);
   const [durationMillis, setDurationMillis] = useState(0);
   const [isExpandedPlayer, setIsExpandedPlayer] = useState(false);
-  const [playerTab, setPlayerTab] = useState<'next' | 'lyrics' | 'related'>('lyrics');
+  const [playerTab, setPlayerTab] = useState<'next' | 'lyrics' | 'related' | 'ai'>('lyrics');
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  // AI State
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const isPlayingRef = useRef<boolean>(false);
@@ -85,9 +89,11 @@ export default function ArtifactDetailScreen() {
   }, [sound]);
 
   let activeLyricIndex = -1;
-  if (activeTrack?.lyrics) {
+  const hasTimestamps = activeTrack?.lyrics?.some((l: any) => l.time >= 0);
+  
+  if (hasTimestamps && activeTrack?.lyrics) {
     for (let i = activeTrack.lyrics.length - 1; i >= 0; i--) {
-      if (positionMillis >= activeTrack.lyrics[i].time) {
+      if (activeTrack.lyrics[i].time >= 0 && positionMillis >= activeTrack.lyrics[i].time) {
         activeLyricIndex = i;
         break;
       }
@@ -95,17 +101,17 @@ export default function ArtifactDetailScreen() {
   }
 
   useEffect(() => {
-    if (showPlayer && scrollViewRef.current && activeLyricIndex >= 0) {
+    if (showPlayer && scrollViewRef.current && activeLyricIndex >= 0 && hasTimestamps) {
       scrollViewRef.current.scrollTo({ 
         y: Math.max(0, (activeLyricIndex * 42) - 60), 
         animated: true 
       });
     }
-  }, [activeLyricIndex, showPlayer, isExpandedPlayer, playerTab]);
+  }, [activeLyricIndex, showPlayer, isExpandedPlayer, playerTab, hasTimestamps]);
 
   const progressPercent = durationMillis > 0 ? Math.min((positionMillis / durationMillis) * 100, 100) : 0;
 
-  const openExpandedView = (tab: 'next' | 'lyrics' | 'related') => {
+  const openExpandedView = (tab: 'next' | 'lyrics' | 'related' | 'ai') => {
     setPlayerTab(tab);
     setIsExpandedPlayer(true);
   };
@@ -123,6 +129,16 @@ export default function ArtifactDetailScreen() {
   );
 
   const fetchAll = async () => {
+    // Set Audio Mode agar bisa berjalan meski HP di-silent
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch (e) {}
+
     setLoading(true);
     // Fetch artifact
     const { data: art } = await supabase
@@ -214,10 +230,20 @@ export default function ArtifactDetailScreen() {
     audioUrl: item.audio_url,
     img: item.image_url ? { uri: item.image_url } : (artifact.image_url ? { uri: artifact.image_url } : FALLBACK_IMAGE),
     lyrics: item.lyrics 
-         ? item.lyrics.split('\n').map((line: string, i: number) => ({ time: i * 3500, text: line })) 
+         ? item.lyrics.split('\n').map((line: string) => {
+             const match = line.match(/^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
+             if (match) {
+               const min = parseInt(match[1]);
+               const sec = parseInt(match[2]);
+               let msStr = match[3];
+               if (msStr.length === 2) msStr += '0';
+               const ms = parseInt(msStr);
+               return { time: min * 60000 + sec * 1000 + ms, text: match[4].trim() };
+             }
+             return { time: -1, text: line };
+           })
          : [
-             { time: 0, text: "(Pemutaran Audio Dimulai...)" },
-             { time: 999999, text: "Lirik belum tersedia untuk audio ini." }
+             { time: -1, text: "Lirik belum tersedia untuk audio ini." }
            ]
   }));
 
@@ -230,6 +256,8 @@ export default function ArtifactDetailScreen() {
     setShowPlayer(true);
     setPositionMillis(0);
     setIsPlaying(false);
+    setAiExplanation(null);
+    setAiLoading(false);
 
     try {
       const { sound: newSound } = await Audio.Sound.createAsync(
@@ -239,8 +267,9 @@ export default function ArtifactDetailScreen() {
       );
       setSound(newSound);
       setIsPlaying(false);
-    } catch (e) {
+    } catch (e: any) {
       console.log('Error playing audio', e);
+      Alert.alert('Error Audio', 'Tidak dapat memutar lagu ini. Pastikan koneksi internet stabil atau URL valid.\nDetail: ' + (e.message || 'Unknown error'));
     }
   };
 
@@ -265,6 +294,44 @@ export default function ArtifactDetailScreen() {
       await sound.playAsync();
       setIsPlaying(true);
     }
+  };
+
+  const fetchAiExplanation = async () => {
+    if (!activeTrack?.lyrics) return;
+    const fullLyrics = activeTrack.lyrics.map((l:any) => l.text).join('\n');
+    setAiLoading(true);
+    setAiExplanation(null);
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.EXPO_PUBLIC_OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'qwen/qwen-2.5-7b-instruct',
+          messages: [
+            {
+              role: 'system',
+              content: 'Anda adalah asisten ahli budaya dan sejarah Melayu. Tugas Anda adalah menganalisis, menjelaskan makna filosofis, dan menerjemahkan (jika perlu) lirik syair/lagu daerah yang diberikan pengguna ke dalam bahasa Indonesia yang sangat indah, jelas, dan mudah dipahami.'
+            },
+            {
+              role: 'user',
+              content: `Tolong jelaskan makna dan filosofi dari lirik berikut:\n\n${fullLyrics}`
+            }
+          ]
+        })
+      });
+      const data = await response.json();
+      if (data.choices && data.choices[0]) {
+        setAiExplanation(data.choices[0].message.content);
+      } else {
+        setAiExplanation('Maaf, AI gagal memproses permintaan.');
+      }
+    } catch (error) {
+      setAiExplanation('Terjadi kesalahan jaringan saat menghubungi AI.');
+    }
+    setAiLoading(false);
   };
 
   const formatTime = (millis: number) => {
@@ -752,6 +819,9 @@ export default function ArtifactDetailScreen() {
                 <TouchableOpacity onPress={() => openExpandedView('lyrics')} style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={[styles.bottomNavText, { color: 'white', fontWeight: 'bold' }]}>Lirik</Text>
                 </TouchableOpacity>
+                <TouchableOpacity onPress={() => openExpandedView('ai')} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={styles.bottomNavText}>Bedah AI</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => openExpandedView('related')} style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={styles.bottomNavText}>Terkait</Text>
                 </TouchableOpacity>
@@ -783,14 +853,14 @@ export default function ArtifactDetailScreen() {
               </View>
 
               <View style={styles.expandedTabs}>
-                {(['next', 'lyrics', 'related'] as const).map(tab => (
+                {(['next', 'lyrics', 'ai', 'related'] as const).map(tab => (
                   <TouchableOpacity 
                     key={tab} 
                     onPress={() => setPlayerTab(tab)} 
                     style={[styles.expandedTab, playerTab === tab && styles.expandedTabActive]}
                   >
                     <Text style={[styles.expandedTabText, playerTab === tab && styles.expandedTabTextActive]}>
-                      {tab === 'next' ? 'Berikutnya' : tab === 'lyrics' ? 'Lirik' : 'Terkait'}
+                      {tab === 'next' ? 'Berikutnya' : tab === 'lyrics' ? 'Lirik' : tab === 'ai' ? 'Bedah AI' : 'Terkait'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -800,13 +870,50 @@ export default function ArtifactDetailScreen() {
                 {playerTab === 'lyrics' && (
                   <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                     {activeTrack?.lyrics?.map((lyric: any, index: number) => {
-                      const isActive = index === activeLyricIndex;
+                      const isActive = hasTimestamps ? index === activeLyricIndex : false;
+                      const isPlain = !hasTimestamps;
                       return (
-                        <Text key={index} style={[styles.lyricText, isActive && styles.lyricTextActive, { textAlign: 'left' }]}>
+                        <Text key={index} style={[
+                          styles.lyricText, 
+                          isPlain ? { color: 'white', opacity: 0.9, marginBottom: 8 } : {},
+                          hasTimestamps && !isActive ? { color: 'rgba(255,255,255,0.4)' } : {},
+                          isActive && styles.lyricTextActive, 
+                          { textAlign: 'left' }
+                        ]}>
                           {lyric.text}
                         </Text>
                       );
                     })}
+                  </ScrollView>
+                )}
+
+                {playerTab === 'ai' && (
+                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                    {/* AI Button Section */}
+                    <View style={{ marginTop: 10, padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <MaterialCommunityIcons name="robot-outline" size={24} color="#f59e0b" />
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16, marginLeft: 8 }}>Asisten Budaya (RAH VerseAI)</Text>
+                      </View>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 16, lineHeight: 20 }}>
+                        Ingin tahu lebih dalam tentang makna filosofis dari lirik atau syair ini?
+                      </Text>
+                      
+                      {aiExplanation ? (
+                        <View style={{ marginTop: 10, padding: 16, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12 }}>
+                          <Text style={{ color: 'white', fontSize: 15, lineHeight: 24 }}>{aiExplanation}</Text>
+                        </View>
+                      ) : aiLoading ? (
+                        <ActivityIndicator color="#f59e0b" style={{ marginVertical: 20 }} />
+                      ) : (
+                        <TouchableOpacity 
+                          style={{ backgroundColor: '#f59e0b', paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                          onPress={fetchAiExplanation}
+                        >
+                          <Text style={{ color: '#0f172a', fontWeight: 'bold', fontSize: 15 }}>✨ Bedah Makna Lirik</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </ScrollView>
                 )}
 

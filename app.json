@@ -43,7 +43,13 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Aplikasi ini membutuhkan akses kalender untuk menyimpan pengingat agenda."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

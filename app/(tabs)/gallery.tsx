@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   Image, ScrollView, StatusBar, StyleSheet, Text, 
   TouchableOpacity, View, Modal, Dimensions, Platform, ActivityIndicator,
-  RefreshControl, LayoutAnimation, UIManager
+  RefreshControl, LayoutAnimation, UIManager, Alert
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -33,7 +33,11 @@ export default function GalleryScreen() {
   const [durationMillis, setDurationMillis] = useState(1);
   const [showPlayer, setShowPlayer] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [playerTab, setPlayerTab] = useState<'next' | 'lyrics' | 'related'>('lyrics');
+  const [playerTab, setPlayerTab] = useState<'next' | 'lyrics' | 'related' | 'ai'>('lyrics');
+
+  // AI State
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
 
   // Eksplorasi Mendalam
   const [artifactsData, setArtifactsData] = useState<any[]>([]);
@@ -57,15 +61,23 @@ export default function GalleryScreen() {
   const fetchPlaylist = async () => {
     setIsLoading(true);
     // Mengambil item galeri yang memiliki audio_url, beserta data artefak induknya
-    const { data, error } = await supabase
+    const { data: legacyData } = await supabase
       .from('gallery_items')
       .select('*, artifacts(name, image_url, description)')
       .not('audio_url', 'is', null)
       .neq('audio_url', '');
 
-    if (data) {
-      const formatted = data.map(item => ({
-        id: item.id,
+    // Mengambil data musik dari tabel khusus 'musics'
+    const { data: musicsData } = await supabase
+      .from('musics')
+      .select('*')
+      .order('id', { ascending: false });
+
+    let combined: any[] = [];
+
+    if (legacyData) {
+      const formattedLegacy = legacyData.map(item => ({
+        id: `legacy_${item.id}`,
         artifactId: item.artifact_id, // Untuk fitur terkait
         title: item.title || item.artifacts?.name || 'Audio Tanpa Judul',
         desc: item.description || item.artifacts?.description || 'Tidak ada deskripsi',
@@ -74,18 +86,68 @@ export default function GalleryScreen() {
              ? { uri: item.image_url } 
              : (item.artifacts?.image_url ? { uri: item.artifacts.image_url } : FALLBACK_IMAGE),
         lyrics: item.lyrics 
-             ? item.lyrics.split('\n').map((line: string, i: number) => ({ time: i * 3500, text: line })) 
+             ? item.lyrics.split('\n').map((line: string, i: number) => {
+                 const match = line.match(/^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
+                 if (match) {
+                   const min = parseInt(match[1]);
+                   const sec = parseInt(match[2]);
+                   let msStr = match[3];
+                   if (msStr.length === 2) msStr += '0';
+                   const ms = parseInt(msStr);
+                   return { time: min * 60000 + sec * 1000 + ms, text: match[4].trim() };
+                 }
+                 return { time: -1, text: line };
+               }) 
              : [
-                 { time: 0, text: "(Pemutaran Audio Dimulai...)" },
-                 { time: 999999, text: "Lirik belum tersedia untuk audio ini." }
+                 { time: -1, text: "Lirik belum tersedia untuk audio ini." }
                ]
       }));
-      setPlaylist(formatted);
+      combined = [...combined, ...formattedLegacy];
     }
+
+    if (musicsData) {
+      const formattedMusics = musicsData.map(item => ({
+        id: `music_${item.id}`,
+        artifactId: null,
+        title: item.title,
+        desc: item.description || 'Tidak ada deskripsi',
+        audioUrl: item.audio_url,
+        img: item.image_url ? { uri: item.image_url } : FALLBACK_IMAGE,
+        lyrics: item.lyrics 
+             ? item.lyrics.split('\n').map((line: string) => {
+                 const match = line.match(/^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
+                 if (match) {
+                   const min = parseInt(match[1]);
+                   const sec = parseInt(match[2]);
+                   let msStr = match[3];
+                   if (msStr.length === 2) msStr += '0';
+                   const ms = parseInt(msStr);
+                   return { time: min * 60000 + sec * 1000 + ms, text: match[4].trim() };
+                 }
+                 return { time: -1, text: line };
+               })
+             : [
+                 { time: -1, text: "Lirik belum tersedia untuk audio ini." }
+               ]
+      }));
+      combined = [...combined, ...formattedMusics];
+    }
+
+    setPlaylist(combined);
     setIsLoading(false);
   };
 
   const fetchGalleryPhotos = async () => {
+    // Set Audio Mode agar bisa berjalan meski HP di-silent
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch (e) {}
+
     const { data } = await supabase
       .from('gallery_items')
       .select('*, artifacts(name, type, year, description)')
@@ -110,6 +172,8 @@ export default function GalleryScreen() {
     setShowPlayer(true);
     setPositionMillis(0);
     setIsPlaying(false);
+    setAiExplanation(null);
+    setAiLoading(false);
 
     try {
       const { sound: newSound } = await Audio.Sound.createAsync(
@@ -119,8 +183,9 @@ export default function GalleryScreen() {
       );
       setSound(newSound);
       setIsPlaying(false);
-    } catch (e) {
+    } catch (e: any) {
       console.log('Error playing audio', e);
+      Alert.alert('Error Audio', 'Tidak dapat memutar lagu ini. Pastikan koneksi internet stabil atau URL valid.\nDetail: ' + (e.message || 'Unknown error'));
     }
   };
 
@@ -145,6 +210,44 @@ export default function GalleryScreen() {
       await sound.playAsync();
       setIsPlaying(true);
     }
+  };
+
+  const fetchAiExplanation = async () => {
+    if (!activeTrack?.lyrics) return;
+    const fullLyrics = activeTrack.lyrics.map((l:any) => l.text).join('\n');
+    setAiLoading(true);
+    setAiExplanation(null);
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.EXPO_PUBLIC_OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'qwen/qwen-2.5-7b-instruct',
+          messages: [
+            {
+              role: 'system',
+              content: 'Anda adalah asisten ahli budaya dan sejarah Melayu. Tugas Anda adalah menganalisis, menjelaskan makna filosofis, dan menerjemahkan (jika perlu) lirik syair/lagu daerah yang diberikan pengguna ke dalam bahasa Indonesia yang sangat indah, jelas, dan mudah dipahami.'
+            },
+            {
+              role: 'user',
+              content: `Tolong jelaskan makna dan filosofi dari lirik berikut:\n\n${fullLyrics}`
+            }
+          ]
+        })
+      });
+      const data = await response.json();
+      if (data.choices && data.choices[0]) {
+        setAiExplanation(data.choices[0].message.content);
+      } else {
+        setAiExplanation('Maaf, AI gagal memproses permintaan.');
+      }
+    } catch (error) {
+      setAiExplanation('Terjadi kesalahan jaringan saat menghubungi AI.');
+    }
+    setAiLoading(false);
   };
 
   useEffect(() => {
@@ -179,11 +282,12 @@ export default function GalleryScreen() {
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  // Find active lyric safely
   let activeLyricIndex = -1;
-  if (activeTrack?.lyrics) {
+  const hasTimestamps = activeTrack?.lyrics?.some((l: any) => l.time >= 0);
+
+  if (hasTimestamps && activeTrack?.lyrics) {
     for (let i = activeTrack.lyrics.length - 1; i >= 0; i--) {
-      if (positionMillis >= activeTrack.lyrics[i].time) {
+      if (activeTrack.lyrics[i].time >= 0 && positionMillis >= activeTrack.lyrics[i].time) {
         activeLyricIndex = i;
         break;
       }
@@ -191,17 +295,17 @@ export default function GalleryScreen() {
   }
 
   useEffect(() => {
-    if (showPlayer && scrollViewRef.current && activeLyricIndex >= 0) {
+    if (showPlayer && scrollViewRef.current && activeLyricIndex >= 0 && hasTimestamps) {
       scrollViewRef.current.scrollTo({ 
         y: Math.max(0, (activeLyricIndex * 42) - 60), 
         animated: true 
       });
     }
-  }, [activeLyricIndex, showPlayer, isExpanded, playerTab]);
+  }, [activeLyricIndex, showPlayer, isExpanded, playerTab, hasTimestamps]);
 
   const progressPercent = Math.min((positionMillis / durationMillis) * 100, 100);
 
-  const openExpandedView = (tab: 'next' | 'lyrics' | 'related') => {
+  const openExpandedView = (tab: 'next' | 'lyrics' | 'related' | 'ai') => {
     setPlayerTab(tab);
     setIsExpanded(true);
   };
@@ -460,6 +564,9 @@ export default function GalleryScreen() {
                 <TouchableOpacity onPress={() => openExpandedView('lyrics')} style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={[styles.bottomNavText, { color: 'white', fontWeight: 'bold' }]}>Lirik</Text>
                 </TouchableOpacity>
+                <TouchableOpacity onPress={() => openExpandedView('ai')} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={styles.bottomNavText}>Bedah AI</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => openExpandedView('related')} style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={styles.bottomNavText}>Terkait</Text>
                 </TouchableOpacity>
@@ -493,14 +600,14 @@ export default function GalleryScreen() {
 
               {/* Tab Menu */}
               <View style={styles.expandedTabs}>
-                {(['next', 'lyrics', 'related'] as const).map(tab => (
+                {(['next', 'lyrics', 'ai', 'related'] as const).map(tab => (
                   <TouchableOpacity 
                     key={tab} 
                     onPress={() => setPlayerTab(tab)} 
                     style={[styles.expandedTab, playerTab === tab && styles.expandedTabActive]}
                   >
                     <Text style={[styles.expandedTabText, playerTab === tab && styles.expandedTabTextActive]}>
-                      {tab === 'next' ? 'Berikutnya' : tab === 'lyrics' ? 'Lirik' : 'Terkait'}
+                      {tab === 'next' ? 'Berikutnya' : tab === 'lyrics' ? 'Lirik' : tab === 'ai' ? 'Bedah AI' : 'Terkait'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -511,13 +618,50 @@ export default function GalleryScreen() {
                 {playerTab === 'lyrics' && (
                   <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                     {activeTrack?.lyrics?.map((lyric: any, index: number) => {
-                      const isActive = index === activeLyricIndex;
+                      const isActive = hasTimestamps ? index === activeLyricIndex : false;
+                      const isPlain = !hasTimestamps;
                       return (
-                        <Text key={index} style={[styles.lyricText, isActive && styles.lyricTextActive, { textAlign: 'left' }]}>
+                        <Text key={index} style={[
+                          styles.lyricText, 
+                          isPlain ? { color: 'white', opacity: 0.9, marginBottom: 8 } : {},
+                          hasTimestamps && !isActive ? { color: 'rgba(255,255,255,0.4)' } : {},
+                          isActive && styles.lyricTextActive, 
+                          { textAlign: 'left' }
+                        ]}>
                           {lyric.text}
                         </Text>
                       );
                     })}
+                  </ScrollView>
+                )}
+
+                {playerTab === 'ai' && (
+                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                    {/* AI Button Section */}
+                    <View style={{ marginTop: 10, padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Ionicons name="sparkles" size={20} color="#f59e0b" />
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16, marginLeft: 8 }}>Bedah Lirik (RAH VerseAI)</Text>
+                      </View>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 16, lineHeight: 20 }}>
+                        Dapatkan penjelasan mendalam tentang makna dan filosofi lirik lagu atau naskah ini.
+                      </Text>
+                      
+                      {aiExplanation ? (
+                        <View style={{ marginTop: 10, padding: 16, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12 }}>
+                          <Text style={{ color: 'white', fontSize: 15, lineHeight: 24 }}>{aiExplanation}</Text>
+                        </View>
+                      ) : aiLoading ? (
+                        <ActivityIndicator color="#f59e0b" style={{ marginVertical: 20 }} />
+                      ) : (
+                        <TouchableOpacity 
+                          style={{ backgroundColor: '#f59e0b', paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                          onPress={fetchAiExplanation}
+                        >
+                          <Text style={{ color: '#0f172a', fontWeight: 'bold', fontSize: 15 }}>✨ Mulai Bedah Makna</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </ScrollView>
                 )}
 
@@ -757,12 +901,12 @@ const styles = StyleSheet.create({
   bottomNavContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 40,
+    paddingHorizontal: 20,
     paddingBottom: Platform.OS === 'ios' ? 20 : 30,
   },
   bottomNavText: {
     color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   lyricText: {
