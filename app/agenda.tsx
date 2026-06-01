@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Dimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ type AgendaItem = {
   title: string;
   description: string;
   event_date: string;
+  image_url?: string;
 };
 
 export default function AgendaScreen() {
@@ -155,6 +157,13 @@ export default function AgendaScreen() {
           <Text style={styles.cardDateMonth}>{month.toUpperCase()}</Text>
         </View>
         <View style={styles.cardContent}>
+          {item.image_url ? (
+            <Image 
+              source={{ uri: item.image_url }} 
+              style={{ width: '100%', height: 160, borderRadius: 12, marginBottom: 12 }} 
+              resizeMode="cover" 
+            />
+          ) : null}
           <Text style={styles.cardTitle}>{item.title}</Text>
           <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
           

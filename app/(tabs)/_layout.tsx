@@ -70,7 +70,18 @@ export default function TabLayout() {
           title: 'Katalog',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-              <Ionicons name={focused ? "book" : "book-outline"} size={20} color={focused ? '#c8956c' : color} />
+              <Ionicons name={focused ? "apps" : "apps-outline"} size={20} color={focused ? '#c8956c' : color} />
+            </View>
+          ),
+        }} 
+      />
+      <Tabs.Screen 
+        name="books" 
+        options={{ 
+          title: 'Buku',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+              <Ionicons name={focused ? "library" : "library-outline"} size={20} color={focused ? '#c8956c' : color} />
             </View>
           ),
         }} 
@@ -81,8 +92,8 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   iconWrap: {
-    width: 42,
-    height: 34,
+    width: 36,
+    height: 32,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',

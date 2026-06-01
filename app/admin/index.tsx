@@ -28,7 +28,7 @@ import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type TabId = 'artifacts' | 'catalogs' | 'locations' | 'gallery' | 'agenda';
+type TabId = 'artifacts' | 'catalogs' | 'locations' | 'gallery' | 'agenda' | 'books';
 
 const TABS: { id: TabId; label: string; icon: string; table: string }[] = [
   { id: 'artifacts', label: 'Artefak',  icon: 'archive',  table: 'artifacts'      },
@@ -36,6 +36,7 @@ const TABS: { id: TabId; label: string; icon: string; table: string }[] = [
   { id: 'locations', label: 'Lokasi',   icon: 'map-pin',  table: 'map_locations'  },
   { id: 'gallery',   label: 'Galeri',   icon: 'image',    table: 'gallery_items'  },
   { id: 'agenda',    label: 'Agenda',   icon: 'calendar', table: 'agenda'         },
+  { id: 'books',     label: 'Buku',     icon: 'book-open', table: 'books'          },
 ];
 
 const TYPE_OPTIONS = ['Artefak', 'Naskah', 'Monumen', 'Benda'];
@@ -52,7 +53,7 @@ export default function AdminPanel() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem]   = useState<any | null>(null);
   const [stats, setStats]               = useState<Record<TabId, number>>({
-    artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0,
+    artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0, books: 0,
   });
 
   // ── Form Fields ──────────────────────────────────────────────────────────────
@@ -100,6 +101,9 @@ export default function AdminPanel() {
   const [agTitle, setAgTitle] = useState('');
   const [agDesc,  setAgDesc]  = useState('');
   const [agDate,  setAgDate]  = useState('');
+  const [agImageUri, setAgImageUri] = useState<string | null>(null);
+  const [agImageUrl, setAgImageUrl] = useState<string | null>(null);
+  const [uploadingAgImg, setUploadingAgImg] = useState(false);
   // Musics
   const [mTitle, setMTitle] = useState('');
   const [mDesc, setMDesc] = useState('');
@@ -110,6 +114,16 @@ export default function AdminPanel() {
   const [mLyrics, setMLyrics] = useState('');
   const [uploadingMImg, setUploadingMImg] = useState(false);
   const [uploadingMAudio, setUploadingMAudio] = useState(false);
+  // Books
+  const [bTitle, setBTitle] = useState('');
+  const [bAuthor, setBAuthor] = useState('');
+  const [bDesc, setBDesc] = useState('');
+  const [bCoverUri, setBCoverUri] = useState<string | null>(null);
+  const [bCoverUrl, setBCoverUrl] = useState<string | null>(null);
+  const [bFileUrl, setBFileUrl] = useState<string | null>(null);
+  const [bFileType, setBFileType] = useState('pdf');
+  const [uploadingBCover, setUploadingBCover] = useState(false);
+  const [uploadingBFile, setUploadingBFile] = useState(false);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const currentTab = TABS.find(t => t.id === activeTab)!;
@@ -130,7 +144,7 @@ export default function AdminPanel() {
         supabase.from(tab.table).select('id', { count: 'exact', head: true })
       )
     );
-    const newStats: Record<TabId, number> = { artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0 };
+    const newStats: Record<TabId, number> = { artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0, books: 0 };
     TABS.forEach((tab, i) => {
       newStats[tab.id] = results[i].count ?? 0;
     });
@@ -317,8 +331,9 @@ export default function AdminPanel() {
     setCType('Benda'); setCName(''); setCYear(''); setCLocation(''); setCDesc(''); setCImageUri(null); setCImageUrl(null);
     setLTitle(''); setLDesc(''); setLLat(''); setLLng('');
     setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null); setGLyrics('');
-    setAgTitle(''); setAgDesc(''); setAgDate('');
+    setAgTitle(''); setAgDesc(''); setAgDate(''); setAgImageUri(null); setAgImageUrl(null);
     setMTitle(''); setMDesc(''); setMAudioUrl(null); setMAudioUri(null); setMImageUrl(null); setMImageUri(null); setMLyrics('');
+    setBTitle(''); setBAuthor(''); setBDesc(''); setBCoverUri(null); setBCoverUrl(null); setBFileUrl(null); setBFileType('pdf');
     setEditingItem(null);
   };
 
@@ -349,6 +364,12 @@ export default function AdminPanel() {
     } else if (activeTab === 'agenda') {
       setAgTitle(item.title ?? '');    setAgDesc(item.description ?? '');
       setAgDate(item.event_date ?? '');
+      setAgImageUri(item.image_url ?? null); setAgImageUrl(item.image_url ?? null);
+    } else if (activeTab === 'books') {
+      setBTitle(item.title ?? ''); setBAuthor(item.author ?? '');
+      setBDesc(item.description ?? '');
+      setBCoverUri(item.cover_url ?? null); setBCoverUrl(item.cover_url ?? null);
+      setBFileUrl(item.file_url ?? null); setBFileType(item.file_type ?? 'pdf');
     }
     setModalVisible(true);
   };
@@ -403,7 +424,19 @@ export default function AdminPanel() {
       return { 
         title: agTitle.trim(), 
         description: agDesc.trim() || null, 
-        event_date: agDate.trim() || null 
+        event_date: agDate.trim() || null,
+        image_url: agImageUrl || null,
+      };
+    }
+    if (activeTab === 'books') {
+      if (!bTitle.trim()) return null;
+      return {
+        title: bTitle.trim(),
+        author: bAuthor.trim() || null,
+        description: bDesc.trim() || null,
+        cover_url: bCoverUrl || null,
+        file_url: bFileUrl || null,
+        file_type: bFileType || 'pdf',
       };
     }
     return null;
@@ -488,6 +521,7 @@ export default function AdminPanel() {
           locations: 'info',
           gallery: 'info',
           agenda: 'agenda',
+          books: 'catalog',
         };
         const notifMessageMap: Record<string, string> = {
           artifacts: `Artefak baru "${notifTitle}" telah ditambahkan ke koleksi.`,
@@ -495,9 +529,10 @@ export default function AdminPanel() {
           locations: `Lokasi baru "${notifTitle}" telah ditandai.`,
           gallery: `Media galeri baru "${notifTitle}" telah diunggah.`,
           agenda: `Agenda baru "${notifTitle}" telah dijadwalkan.`,
+          books: `Buku baru "${notifTitle}" telah ditambahkan ke perpustakaan.`,
         };
         await supabase.from('notifications').insert([{
-          title: `${activeTab === 'artifacts' ? '📜' : activeTab === 'agenda' ? '📅' : activeTab === 'catalogs' ? '📖' : activeTab === 'gallery' ? '🖼️' : '🔔'} ${notifTitle}`,
+          title: `${activeTab === 'artifacts' ? '📜' : activeTab === 'agenda' ? '📅' : activeTab === 'catalogs' ? '📖' : activeTab === 'gallery' ? '🖼️' : activeTab === 'books' ? '📚' : '🔔'} ${notifTitle}`,
           message: notifMessageMap[activeTab] || `Data baru telah ditambahkan.`,
           type: notifTypeMap[activeTab] || 'info',
         }]);
@@ -570,6 +605,13 @@ export default function AdminPanel() {
         <Text style={styles.itemTitle}>{item.title}</Text>
         <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
         <Text style={styles.metaText}>📅 {item.event_date}</Text>
+      </>
+    );
+    if (activeTab === 'books') return (
+      <>
+        <Text style={styles.itemTitle}>{item.title}</Text>
+        <Text style={styles.itemDesc} numberOfLines={1}>{item.author ? `oleh ${item.author}` : 'Penulis tidak diketahui'}</Text>
+        <Text style={styles.metaText}>📄 {item.file_url ? `File ${(item.file_type || 'pdf').toUpperCase()} tersedia` : 'Belum ada file'}</Text>
       </>
     );
     return null;
@@ -1064,12 +1106,111 @@ export default function AdminPanel() {
 
     if (activeTab === 'agenda') return (
       <>
+        <Text style={styles.formLabel}>Poster Agenda (Opsional)</Text>
+        <TouchableOpacity
+          style={styles.imgPicker}
+          activeOpacity={0.8}
+          onPress={() => pickAndUploadImage('gallery', 'agenda_posters', setAgImageUri, setAgImageUrl, setUploadingAgImg)}
+        >
+          {agImageUri ? (
+            <Image source={{ uri: agImageUri }} style={styles.imgPreview} resizeMode="cover" />
+          ) : (
+            <View style={styles.imgPlaceholder}>
+              <Feather name="image" size={28} color="#94a3b8" />
+              <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih poster</Text>
+            </View>
+          )}
+          {uploadingAgImg && (
+            <View style={styles.imgOverlay}>
+              <ActivityIndicator color="#ffffff" />
+              <Text style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Mengupload...</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        {agImageUrl && <Text style={styles.imgSuccess}>✓ Poster berhasil diupload</Text>}
+
         <Text style={styles.formLabel}>Nama Acara <Text style={styles.required}>*</Text></Text>
         <TextInput style={styles.formInput} value={agTitle} onChangeText={setAgTitle} placeholder="Nama acara budaya..." placeholderTextColor="#94a3b8" />
         <Text style={styles.formLabel}>Deskripsi</Text>
         <TextInput style={[styles.formInput, styles.formTextarea]} value={agDesc} onChangeText={setAgDesc} placeholder="Deskripsi acara..." placeholderTextColor="#94a3b8" multiline numberOfLines={3} textAlignVertical="top" />
         <Text style={styles.formLabel}>Tanggal (YYYY-MM-DD)</Text>
         <TextInput style={styles.formInput} value={agDate} onChangeText={setAgDate} placeholder="cth: 2026-10-25" placeholderTextColor="#94a3b8" />
+      </>
+    );
+
+    if (activeTab === 'books') return (
+      <>
+        <Text style={styles.formLabel}>Cover Buku</Text>
+        <TouchableOpacity
+          style={styles.imgPicker}
+          activeOpacity={0.8}
+          onPress={() => pickAndUploadImage('gallery', 'books_covers', setBCoverUri, setBCoverUrl, setUploadingBCover)}
+        >
+          {bCoverUri ? (
+            <Image source={{ uri: bCoverUri }} style={styles.imgPreview} resizeMode="cover" />
+          ) : (
+            <View style={styles.imgPlaceholder}>
+              <Feather name="image" size={28} color="#94a3b8" />
+              <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih cover</Text>
+            </View>
+          )}
+          {uploadingBCover && (
+            <View style={styles.imgOverlay}>
+              <ActivityIndicator color="#ffffff" />
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.formLabel}>File Dokumen (PDF/EPUB/DOC) <Text style={styles.required}>*</Text></Text>
+        <TouchableOpacity
+          style={[styles.imgPicker, { minHeight: 60 }]}
+          activeOpacity={0.8}
+          onPress={async () => {
+            try {
+              const res = await DocumentPicker.getDocumentAsync({
+                type: ['application/pdf', 'application/epub+zip', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '*/*'],
+                copyToCacheDirectory: true,
+              });
+              if (res.canceled || !res.assets[0]) return;
+              setUploadingBFile(true);
+              const uri = res.assets[0].uri;
+              const fileName = res.assets[0].name;
+              const ext = fileName.split('.').pop()?.toLowerCase() || 'pdf';
+              setBFileType(ext);
+              const path = `books_files/${Date.now()}.${ext}`;
+              const formData = new FormData();
+              formData.append('files', {
+                uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+                name: `book_${Date.now()}.${ext}`,
+                type: ext === 'pdf' ? 'application/pdf' : ext === 'epub' ? 'application/epub+zip' : 'application/octet-stream',
+              } as any);
+              const { error } = await supabase.storage.from('gallery').upload(path, formData, { upsert: true });
+              if (error) throw error;
+              const { data } = supabase.storage.from('gallery').getPublicUrl(path);
+              setBFileUrl(data.publicUrl);
+              Alert.alert('Berhasil', `File ${ext.toUpperCase()} berhasil diunggah.`);
+            } catch (e: any) {
+              Alert.alert('Gagal Upload File', e.message);
+            } finally {
+              setUploadingBFile(false);
+            }
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Feather name="file-text" size={20} color="#94a3b8" />
+            <Text style={{ color: '#64748b', flex: 1 }}>
+              {bFileUrl ? `✓ File ${bFileType.toUpperCase()} sudah diunggah. Ketuk untuk ganti.` : 'Ketuk untuk pilih file dokumen'}
+            </Text>
+          </View>
+          {uploadingBFile && <ActivityIndicator color="#0f172a" style={{ position: 'absolute', right: 20 }} />}
+        </TouchableOpacity>
+
+        <Text style={styles.formLabel}>Judul Buku <Text style={styles.required}>*</Text></Text>
+        <TextInput style={styles.formInput} value={bTitle} onChangeText={setBTitle} placeholder="Judul buku..." placeholderTextColor="#94a3b8" />
+        <Text style={styles.formLabel}>Penulis / Pengarang</Text>
+        <TextInput style={styles.formInput} value={bAuthor} onChangeText={setBAuthor} placeholder="Nama penulis..." placeholderTextColor="#94a3b8" />
+        <Text style={styles.formLabel}>Deskripsi / Sinopsis</Text>
+        <TextInput style={[styles.formInput, styles.formTextarea]} value={bDesc} onChangeText={setBDesc} placeholder="Ringkasan isi buku..." placeholderTextColor="#94a3b8" multiline numberOfLines={4} textAlignVertical="top" />
       </>
     );
 

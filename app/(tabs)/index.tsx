@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar, Animated, Dimensions, Easing, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar, Animated, Dimensions, Easing, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -54,7 +54,22 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [agendaData, setAgendaData] = useState<any[]>([]);
+  const [showAgendaModal, setShowAgendaModal] = useState(false);
+  const [showFloatingAgenda, setShowFloatingAgenda] = useState(false);
+  const floatingAnim = useRef(new Animated.Value(0)).current;
+  const hasShownAgendaModal = useRef(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (showFloatingAgenda) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(floatingAnim, { toValue: -8, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+          Animated.timing(floatingAnim, { toValue: 0, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) })
+        ])
+      ).start();
+    }
+  }, [showFloatingAgenda]);
 
   const fetchUnreadCount = async () => {
     try {
@@ -107,12 +122,21 @@ export default function HomeScreen() {
   };
 
   const fetchAgendaFast = async () => {
+    const today = new Date().toISOString().split('T')[0];
     const { data } = await supabase
       .from('agenda')
       .select('*')
+      .gte('event_date', today) // Hanya ambil yang di masa depan/hari ini
       .order('event_date', { ascending: true })
       .limit(2);
+    
     setAgendaData(data || []);
+
+    // Tampilkan popup jika ada agenda terdekat dan belum ditampilkan di sesi ini
+    if (data && data.length > 0 && !hasShownAgendaModal.current) {
+      setShowAgendaModal(true);
+      hasShownAgendaModal.current = true;
+    }
   };
 
   useFocusEffect(
@@ -412,6 +436,111 @@ export default function HomeScreen() {
 
         </ScrollView>
       </SafeAreaView>
+
+      {/* Premium Pop-up Modal Agenda Mendatang */}
+      <Modal
+        visible={showAgendaModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowAgendaModal(false);
+          setShowFloatingAgenda(true);
+        }}
+      >
+        <View style={styles.modalOverlayPremium}>
+          <Animated.View style={[styles.modalContentPremium, { transform: [{ scale: 1 }] }]}>
+            
+            {agendaData.length > 0 && (
+              <View style={{ width: '100%' }}>
+                {/* Header / Poster Banner */}
+                <View style={styles.modalPosterWrap}>
+                  {agendaData[0].image_url ? (
+                    <Image source={{ uri: agendaData[0].image_url }} style={styles.modalPosterImg} resizeMode="cover" />
+                  ) : (
+                    <LinearGradient colors={['#8B5E3C', '#5c4033']} style={styles.modalPosterImg} />
+                  )}
+                  
+                  {/* Floating Elements on Poster */}
+                  <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent', 'rgba(0,0,0,0.8)']} style={styles.modalPosterGradient} />
+                  
+                  <View style={styles.modalBadgeSegera}>
+                    <Ionicons name="sparkles" size={14} color="#fbbf24" />
+                    <Text style={styles.modalBadgeSegeraText}>SEGERA HADIR</Text>
+                  </View>
+
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setShowAgendaModal(false);
+                      setShowFloatingAgenda(true);
+                    }} 
+                    style={styles.modalCloseBtnPremium}
+                  >
+                    <Feather name="x" size={20} color="#ffffff" />
+                  </TouchableOpacity>
+
+                  <View style={styles.modalPosterBottomText}>
+                    <Text style={styles.modalPremiumDate}>
+                      {new Date(agendaData[0].event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Body Content */}
+                <View style={styles.modalBodyPremium}>
+                  <Text style={styles.modalPremiumTitle} numberOfLines={2}>{agendaData[0].title}</Text>
+                  
+                  {agendaData[0].description && (
+                    <Text style={styles.modalPremiumDesc} numberOfLines={3}>
+                      {agendaData[0].description}
+                    </Text>
+                  )}
+                  
+                  {/* Action Button */}
+                  <TouchableOpacity 
+                    activeOpacity={0.8}
+                    style={styles.modalActionBtnPremiumWrap}
+                    onPress={() => {
+                      setShowAgendaModal(false);
+                      router.push('/agenda');
+                    }}
+                  >
+                    <LinearGradient 
+                      colors={['#1e293b', '#0f172a']} 
+                      style={styles.modalActionBtnPremium}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    >
+                      <Text style={styles.modalActionBtnTextPremium}>Lihat Detail Acara</Text>
+                      <Feather name="arrow-right" size={18} color="#ffffff" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Pure 3D Floating Icon */}
+      {showFloatingAgenda && agendaData.length > 0 && (
+        <Animated.View style={[styles.floatingWidgetContainer, { transform: [{ translateY: floatingAnim }] }]}>
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={() => router.push('/agenda')}
+            style={styles.floatingWidgetGraphicOnly}
+          >
+            <Image 
+              source={require('../../assets/images/keris_calendar_nobg_v2.png')} 
+              style={styles.floatingWidgetImgTrans} 
+              resizeMode="contain" 
+            />
+            
+            <TouchableOpacity onPress={() => setShowFloatingAgenda(false)} style={styles.floatingWidgetClose}>
+              <Feather name="x" size={12} color="#fff" />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
     </View>
   );
 }
@@ -582,9 +711,215 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     height: '100%',
   },
+  emptyText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  // Premium Modal Popup Agenda
+  modalOverlayPremium: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContentPremium: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 320,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    elevation: 20,
+  },
+  modalPosterWrap: {
+    width: '100%',
+    height: 160,
+    position: 'relative',
+    backgroundColor: '#0f172a',
+  },
+  modalPosterImg: {
+    width: '100%',
+    height: '100%',
+  },
+  modalPosterGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalBadgeSegera: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  modalBadgeSegeraText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  modalCloseBtnPremium: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  modalPosterBottomText: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+  },
+  modalPremiumDate: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  modalBodyPremium: {
+    padding: 20,
+    paddingTop: 16,
+  },
+  modalPremiumTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 6,
+    lineHeight: 24,
+  },
+  modalPremiumDesc: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalActionBtnPremiumWrap: {
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  modalActionBtnPremium: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 8,
+  },
+  modalActionBtnTextPremium: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  // Floating Widget (Mini Banner)
+  floatingWidgetContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    zIndex: 999,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+  },
+  floatingWidgetGraphicOnly: {
+    position: 'relative',
+    width: 100,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  floatingWidgetImgTrans: {
+    width: '100%',
+    height: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+  },
+  floatingWidgetClose: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
   filterBtn: {
     padding: 4,
     marginLeft: 8,
+  },
+  quickMenusContainer: {
+    paddingHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 20,
+  },
+  quickMenuBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  quickMenuIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#fdf2e9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  quickMenuTextWrap: {
+    flex: 1,
+  },
+  quickMenuBtnTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  quickMenuBtnDesc: {
+    fontSize: 12,
+    color: '#64748b',
   },
   categoriesContainer: {
     paddingBottom: 24,
