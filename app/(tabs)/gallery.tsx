@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   Image, ScrollView, StatusBar, StyleSheet, Text, 
   TouchableOpacity, View, Modal, Dimensions, Platform, ActivityIndicator,
-  RefreshControl, LayoutAnimation, UIManager, Alert
+  RefreshControl, LayoutAnimation, UIManager, Alert, Linking
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -15,6 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import ImageViewing from 'react-native-image-viewing';
+import { Video, ResizeMode } from 'expo-av';
+import { WebView } from 'react-native-webview';
 
 const { width, height } = Dimensions.get('window');
 
@@ -43,8 +45,21 @@ export default function GalleryScreen() {
   const [artifactsData, setArtifactsData] = useState<any[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
   const [zoomImageUri, setZoomImageUri] = useState<string | null>(null);
+  const [galleryPage, setGalleryPage] = useState(0);
+  const [galleryHasMore, setGalleryHasMore] = useState(true);
+  const [galleryLoadingMore, setGalleryLoadingMore] = useState(false);
+
+  const GALLERY_PAGE_SIZE = 15;
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return '';
+    let videoId = '';
+    
+    // (Fungsi ini tidak lagi digunakan secara aktif karena WebView diganti eksternal link, tapi dibiarkan untuk jaga-jaga jika diperlukan formatnya)
+    return videoId ? `https://www.youtube.com/embed/${videoId}?playsinline=1` : url;
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -54,7 +69,9 @@ export default function GalleryScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchPlaylist(), fetchGalleryPhotos()]);
+    setGalleryPage(0);
+    setGalleryHasMore(true);
+    await Promise.all([fetchPlaylist(), fetchGalleryPhotos(0, false)]);
     setRefreshing(false);
   }, []);
 
@@ -137,7 +154,7 @@ export default function GalleryScreen() {
     setIsLoading(false);
   };
 
-  const fetchGalleryPhotos = async () => {
+  const fetchGalleryPhotos = async (pageNum = 0, append = false) => {
     // Set Audio Mode agar bisa berjalan meski HP di-silent
     try {
       await Audio.setAudioModeAsync({
@@ -148,18 +165,40 @@ export default function GalleryScreen() {
       });
     } catch (e) {}
 
+    if (append) setGalleryLoadingMore(true);
+
+    const from = pageNum * GALLERY_PAGE_SIZE;
+    const to = from + GALLERY_PAGE_SIZE - 1;
+
     const { data } = await supabase
       .from('gallery_items')
       .select('*, artifacts(name, type, year, description)')
-      .not('image_url', 'is', null)
-      .neq('image_url', '')
-      .order('id', { ascending: false });
-    setArtifactsData(data || []);
+      .or('image_url.neq."",video_url.neq.""')
+      .order('id', { ascending: false })
+      .range(from, to);
+
+    const fetched = data || [];
+    if (fetched.length < GALLERY_PAGE_SIZE) setGalleryHasMore(false);
+    else setGalleryHasMore(true);
+
+    if (append) {
+      setArtifactsData(prev => [...prev, ...fetched]);
+    } else {
+      setArtifactsData(fetched);
+    }
+    setGalleryPage(pageNum);
+    if (append) setGalleryLoadingMore(false);
   };
+
+  const loadMoreGallery = useCallback(() => {
+    if (!galleryLoadingMore && galleryHasMore) {
+      fetchGalleryPhotos(galleryPage + 1, true);
+    }
+  }, [galleryLoadingMore, galleryHasMore, galleryPage]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchGalleryPhotos();
+      fetchGalleryPhotos(0, false);
     }, [])
   );
 
@@ -354,40 +393,104 @@ export default function GalleryScreen() {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Galeri Foto</Text>
+        <Text style={styles.sectionTitle}>Galeri Visual</Text>
         <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, paddingHorizontal: 20 }}>
-          {artifactsData.length} koleksi foto naskah & artefak bersejarah
+          {artifactsData.length} koleksi foto & video artefak bersejarah
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 8 }}>
-          {artifactsData.length === 0 ? (
-            <View style={{ padding: 30, alignItems: 'center' }}>
-              <Feather name="image" size={40} color="#cbd5e1" style={{ marginBottom: 12 }} />
-              <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Belum ada foto galeri.</Text>
+        
+        {artifactsData.length === 0 ? (
+          <View style={{ padding: 30, alignItems: 'center' }}>
+            <Feather name="image" size={40} color="#cbd5e1" style={{ marginBottom: 12 }} />
+            <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Belum ada media visual.</Text>
+          </View>
+        ) : (
+          <View style={{ paddingHorizontal: 16 }}>
+            {/* Pinterest-style Masonry Grid */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {/* Kolom Kiri */}
+              <View style={{ flex: 1 }}>
+                {artifactsData.filter((_: any, i: number) => i % 2 === 0).map((item: any, index: number) => (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={[styles.photoCard, { height: index % 3 === 0 ? 220 : 170 }]}
+                    activeOpacity={0.85}
+                    onPress={() => setSelectedPhoto(item)}
+                  >
+                    <Image source={item.image_url ? { uri: item.image_url } : FALLBACK_IMAGE} style={styles.exploreImg} />
+                    <LinearGradient 
+                      colors={['transparent', 'rgba(0,0,0,0.8)']} 
+                      locations={[0.35, 1]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    {item.video_url && (
+                      <View style={styles.videoPlayOverlay}>
+                        <View style={styles.videoPlayBtn}>
+                          <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+                        </View>
+                      </View>
+                    )}
+                    <View style={styles.exploreOverlay}>
+                      <View style={[styles.exploreTypeBadge, item.video_url && { backgroundColor: 'rgba(239,68,68,0.7)', borderColor: 'rgba(239,68,68,0.5)' }]}>
+                        <Feather name={item.video_url ? 'film' : 'image'} size={9} color="#fff" style={{ marginRight: 4 }} />
+                        <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || 'Foto')}</Text>
+                      </View>
+                      <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {/* Kolom Kanan */}
+              <View style={{ flex: 1 }}>
+                {artifactsData.filter((_: any, i: number) => i % 2 === 1).map((item: any, index: number) => (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={[styles.photoCard, { height: index % 3 === 0 ? 170 : 220 }]}
+                    activeOpacity={0.85}
+                    onPress={() => setSelectedPhoto(item)}
+                  >
+                    <Image source={item.image_url ? { uri: item.image_url } : FALLBACK_IMAGE} style={styles.exploreImg} />
+                    <LinearGradient 
+                      colors={['transparent', 'rgba(0,0,0,0.8)']} 
+                      locations={[0.35, 1]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    {item.video_url && (
+                      <View style={styles.videoPlayOverlay}>
+                        <View style={styles.videoPlayBtn}>
+                          <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+                        </View>
+                      </View>
+                    )}
+                    <View style={styles.exploreOverlay}>
+                      <View style={[styles.exploreTypeBadge, item.video_url && { backgroundColor: 'rgba(239,68,68,0.7)', borderColor: 'rgba(239,68,68,0.5)' }]}>
+                        <Feather name={item.video_url ? 'film' : 'image'} size={9} color="#fff" style={{ marginRight: 4 }} />
+                        <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || 'Foto')}</Text>
+                      </View>
+                      <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          ) : (
-            artifactsData.map((item) => (
+
+            {galleryHasMore && artifactsData.length > 0 && (
               <TouchableOpacity 
-                key={item.id} 
-                style={styles.photoCard}
-                activeOpacity={0.85}
-                onPress={() => setSelectedPhoto(item)}
+                onPress={loadMoreGallery}
+                style={{ marginTop: 8, paddingVertical: 14, backgroundColor: '#f1f5f9', borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                activeOpacity={0.7}
               >
-                <Image source={{ uri: item.image_url }} style={styles.exploreImg} />
-                <LinearGradient 
-                  colors={['transparent', 'rgba(0,0,0,0.75)']} 
-                  locations={[0.4, 1]}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={styles.exploreOverlay}>
-                  <View style={styles.exploreTypeBadge}>
-                    <Text style={styles.exploreTypeText}>{item.artifacts?.type || 'Foto'}</Text>
-                  </View>
-                  <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
-                </View>
+                {galleryLoadingMore ? (
+                  <ActivityIndicator size="small" color="#64748b" />
+                ) : (
+                  <>
+                    <Feather name="plus-circle" size={16} color="#64748b" />
+                    <Text style={{ color: '#64748b', fontWeight: '600', fontSize: 14 }}>Muat Lebih Banyak</Text>
+                  </>
+                )}
               </TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
+            )}
+          </View>
+        )}
 
         <View style={{ height: 20 }} />
       </ScrollView>
@@ -398,98 +501,177 @@ export default function GalleryScreen() {
           <View style={{ flex: 1, backgroundColor: '#000' }}>
             <StatusBar barStyle="light-content" />
             
-            {/* Full Background Image */}
-            <Image 
-              source={{ uri: selectedPhoto.image_url }} 
-              style={{ width, height, position: 'absolute' }} 
-              resizeMode="cover"
-            />
-
-            {/* Top Buttons */}
-            <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10 }}>
-                <TouchableOpacity 
-                  onPress={() => setSelectedPhoto(null)} 
-                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
-                >
-                  <Feather name="chevron-left" size={22} color="#ffffff" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => setZoomImageUri(selectedPhoto.image_url)}
-                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
-                >
-                  <Feather name="zoom-in" size={20} color="#ffffff" />
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
-
-            {/* Bottom Card Overlay */}
-            <View style={styles.photoDetailCard}>
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.45 }}>
-                {/* Location Pin + Title */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                    <Ionicons name="location" size={22} color="#ffffff" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
-                      {selectedPhoto.title || selectedPhoto.artifacts?.name || 'Tanpa Judul'}
-                    </Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
-                      Pulau Penyengat, Kepulauan Riau
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Stats Row */}
-                <View style={styles.photoStatsRow}>
-                  <View style={styles.photoStatItem}>
-                    <Feather name="archive" size={14} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.type || 'Foto'}</Text>
-                  </View>
-                  <View style={styles.photoStatDivider} />
-                  <View style={styles.photoStatItem}>
-                    <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || 'Abad 19'}</Text>
-                  </View>
-                  <View style={styles.photoStatDivider} />
-                  <View style={styles.photoStatItem}>
-                    <Ionicons name="star" size={14} color="#fbbf24" />
-                    <Text style={styles.photoStatText}>5.0</Text>
-                  </View>
-                </View>
-
-                {/* Description */}
-                <View style={{ marginTop: 16 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
-                  <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
-                    {selectedPhoto.description || selectedPhoto.artifacts?.description || 'Tidak ada deskripsi untuk foto ini.'}
-                  </Text>
-                </View>
-
-                {/* Action Buttons */}
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-                  <TouchableOpacity 
-                    onPress={() => setZoomImageUri(selectedPhoto.image_url)} 
-                    style={[styles.photoCloseBtn, { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' }]}
-                    activeOpacity={0.8}
-                  >
-                    <Feather name="zoom-in" size={16} color="#ffffff" />
-                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Perbesar</Text>
-                  </TouchableOpacity>
+            {selectedPhoto?.video_url ? (
+              <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+                {/* Header khusus Video */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 }}>
                   <TouchableOpacity 
                     onPress={() => setSelectedPhoto(null)} 
-                    style={[styles.photoCloseBtn, { flex: 1 }]}
-                    activeOpacity={0.8}
+                    style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
                   >
-                    <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Tutup</Text>
+                    <Feather name="chevron-left" size={22} color="#ffffff" />
                   </TouchableOpacity>
+                  <Text style={{ color: 'white', fontSize: 16, fontWeight: '700', alignSelf: 'center' }}>Pemutar Video</Text>
+                  <View style={{ width: 44 }} />
                 </View>
-              </ScrollView>
-            </View>
+
+                {/* Pemutar Video */}
+                <View style={{ width: '100%', aspectRatio: 16/9, backgroundColor: '#000' }}>
+                  {selectedPhoto.video_url.includes('youtube.com') || selectedPhoto.video_url.includes('youtu.be') ? (
+                    <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }}>
+                      <Feather name="youtube" size={48} color="#ef4444" style={{ marginBottom: 16 }} />
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
+                        Video ini dari YouTube dan dibatasi untuk diputar di dalam aplikasi.
+                      </Text>
+                      <TouchableOpacity 
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ef4444', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24 }}
+                        onPress={() => Linking.openURL(selectedPhoto.video_url)}
+                        activeOpacity={0.8}
+                      >
+                        <Feather name="external-link" size={16} color="#ffffff" style={{ marginRight: 8 }} />
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>Tonton di YouTube</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <Video
+                      source={{ uri: selectedPhoto.video_url }}
+                      style={{ flex: 1 }}
+                      useNativeControls
+                      resizeMode={ResizeMode.CONTAIN}
+                      shouldPlay
+                    />
+                  )}
+                </View>
+
+                {/* Info Card di Bawah Video */}
+                <ScrollView style={{ flex: 1, padding: 20 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <Ionicons name="location" size={22} color="#ffffff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
+                        {selectedPhoto.title || selectedPhoto.artifacts?.name || 'Tanpa Judul'}
+                      </Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                        Pulau Penyengat, Kepulauan Riau
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={[styles.photoStatsRow, { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingVertical: 12 }]}>
+                    <View style={styles.photoStatItem}>
+                      <Feather name="archive" size={14} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.type || 'Video'}</Text>
+                    </View>
+                    <View style={styles.photoStatDivider} />
+                    <View style={styles.photoStatItem}>
+                      <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || 'Masa Kini'}</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ marginTop: 20, marginBottom: 40 }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
+                      {selectedPhoto.description || selectedPhoto.artifacts?.description || 'Tidak ada deskripsi untuk video ini.'}
+                    </Text>
+                  </View>
+                </ScrollView>
+              </SafeAreaView>
+            ) : (
+              <>
+                {/* Mode Tampilan Khusus Gambar (Desain Lama) */}
+                <Image 
+                  source={{ uri: selectedPhoto.image_url }} 
+                  style={{ width, height, position: 'absolute' }} 
+                  resizeMode="cover"
+                />
+
+                {/* Top Buttons (Hanya untuk foto) */}
+                <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10 }}>
+                    <TouchableOpacity 
+                      onPress={() => setSelectedPhoto(null)} 
+                      style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
+                    >
+                      <Feather name="chevron-left" size={22} color="#ffffff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={() => setZoomImageUri(selectedPhoto.image_url)}
+                      style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
+                    >
+                      <Feather name="zoom-in" size={20} color="#ffffff" />
+                    </TouchableOpacity>
+                  </View>
+                </SafeAreaView>
+
+                {/* Bottom Card Overlay */}
+                <View style={styles.photoDetailCard}>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.45 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <Ionicons name="location" size={22} color="#ffffff" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
+                          {selectedPhoto.title || selectedPhoto.artifacts?.name || 'Tanpa Judul'}
+                        </Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                          Pulau Penyengat, Kepulauan Riau
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.photoStatsRow}>
+                      <View style={styles.photoStatItem}>
+                        <Feather name="archive" size={14} color="rgba(255,255,255,0.7)" />
+                        <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.type || 'Foto'}</Text>
+                      </View>
+                      <View style={styles.photoStatDivider} />
+                      <View style={styles.photoStatItem}>
+                        <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
+                        <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || 'Abad 19'}</Text>
+                      </View>
+                      <View style={styles.photoStatDivider} />
+                      <View style={styles.photoStatItem}>
+                        <Ionicons name="star" size={14} color="#fbbf24" />
+                        <Text style={styles.photoStatText}>5.0</Text>
+                      </View>
+                    </View>
+
+                    <View style={{ marginTop: 16 }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
+                        {selectedPhoto.description || selectedPhoto.artifacts?.description || 'Tidak ada deskripsi untuk foto ini.'}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+                      <TouchableOpacity 
+                        onPress={() => setZoomImageUri(selectedPhoto.image_url)} 
+                        style={[styles.photoCloseBtn, { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                        activeOpacity={0.8}
+                      >
+                        <Feather name="zoom-in" size={16} color="#ffffff" />
+                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Perbesar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => setSelectedPhoto(null)} 
+                        style={[styles.photoCloseBtn, { flex: 1 }]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Tutup</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
+                </View>
+              </>
+            )}
           </View>
         </Modal>
       )}
+ 
 
       {/* Zoom Lightbox */}
       <ImageViewing
@@ -960,18 +1142,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  // Galeri Foto
+  // Galeri Visual - Pinterest Masonry Grid
   photoCard: {
-    width: 200,
-    height: 260,
-    borderRadius: 20,
+    width: '100%',
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#e2e8f0',
     position: 'relative',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
   },
   exploreImg: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
+  },
+  videoPlayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(239,68,68,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   exploreOverlay: {
     position: 'absolute',
@@ -981,7 +1188,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   exploreTypeBadge: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -989,6 +1196,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   exploreTypeText: {
     color: '#ffffff',

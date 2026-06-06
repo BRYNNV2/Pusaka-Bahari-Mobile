@@ -72,6 +72,8 @@ const TYPE_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
 
 const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.jpg');
 
+const PAGE_SIZE = 20;
+
 export default function CatalogScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
@@ -80,32 +82,57 @@ export default function CatalogScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ArtifactItem | null>(null);
   const [selectedKamus, setSelectedKamus] = useState<typeof KAMUS_DATA[0] | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchArtifacts = useCallback(async (refresh = false) => {
-    if (refresh) setIsRefreshing(true);
-    else setIsLoading(true);
+  const fetchArtifacts = useCallback(async (refresh = false, pageNum = 0) => {
+    if (refresh) {
+      setIsRefreshing(true);
+      pageNum = 0;
+    } else if (pageNum === 0) {
+      setIsLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
     const { data, error } = await supabase
       .from('catalogs')
       .select('id, type, name, year, description, image_url, location')
-      .order('name', { ascending: true });
+      .order('name', { ascending: true })
+      .range(from, to);
 
-    // Gabungkan data dari database dengan data ensiklopedia statis kita
-    let combinedData = [...ENCYCLOPEDIA_DATA];
-    
-    if (data && data.length > 0) {
-      combinedData = [...data, ...ENCYCLOPEDIA_DATA];
+    const fetched = data || [];
+    if (fetched.length < PAGE_SIZE) setHasMore(false);
+    else setHasMore(true);
+
+    if (pageNum === 0) {
+      // Halaman pertama: gabungkan data DB + ensiklopedia statis
+      const combinedData = fetched.length > 0 ? [...fetched, ...ENCYCLOPEDIA_DATA] : [...ENCYCLOPEDIA_DATA];
+      setDatabase(combinedData);
+    } else {
+      // Halaman berikutnya: tambahkan data baru ke state yang sudah ada
+      setDatabase(prev => [...prev, ...fetched]);
     }
 
-    setDatabase(combinedData);
-
+    setPage(pageNum);
     if (refresh) setIsRefreshing(false);
-    else setIsLoading(false);
+    else if (pageNum === 0) setIsLoading(false);
+    else setLoadingMore(false);
   }, []);
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore && !isLoading) {
+      fetchArtifacts(false, page + 1);
+    }
+  }, [loadingMore, hasMore, isLoading, page, fetchArtifacts]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchArtifacts();
+      fetchArtifacts(false, 0);
     }, [fetchArtifacts])
   );
 
@@ -251,10 +278,20 @@ export default function CatalogScreen() {
             renderItem={renderItem}
             numColumns={2}
             columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 24 }}
-            contentContainerStyle={{ paddingBottom: 0, paddingTop: 8, gap: 20 }}
+            contentContainerStyle={{ paddingBottom: 20, paddingTop: 8, gap: 20 }}
             showsVerticalScrollIndicator={false}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
             refreshControl={
-              <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchArtifacts(true)} tintColor="#0f172a" />
+              <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchArtifacts(true, 0)} tintColor="#0f172a" />
+            }
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#64748b" />
+                  <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>Memuat lebih banyak...</Text>
+                </View>
+              ) : null
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>

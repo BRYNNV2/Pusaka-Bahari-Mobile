@@ -11,6 +11,7 @@ import {
   Dimensions,
   Linking,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -34,26 +35,65 @@ type BookItem = {
   created_at: string;
 };
 
+const PAGE_SIZE = 10;
+
 export default function BooksScreen() {
   const router = useRouter();
   const [books, setBooks] = useState<BookItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBook, setSelectedBook] = useState<BookItem | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [totalBooks, setTotalBooks] = useState(0);
 
-  const fetchBooks = async () => {
-    setLoading(true);
-    const { data } = await supabase
+  const fetchBooks = useCallback(async (refresh = false, pageNum = 0) => {
+    if (refresh) {
+      setRefreshing(true);
+      pageNum = 0;
+    } else if (pageNum === 0) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, count } = await supabase
       .from('books')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setBooks((data as BookItem[]) || []);
-    setLoading(false);
-  };
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    const fetched = (data as BookItem[]) || [];
+    if (count !== null) setTotalBooks(count);
+    if (fetched.length < PAGE_SIZE) setHasMore(false);
+    else setHasMore(true);
+
+    if (pageNum === 0) {
+      setBooks(fetched);
+    } else {
+      setBooks(prev => [...prev, ...fetched]);
+    }
+
+    setPage(pageNum);
+    if (refresh) setRefreshing(false);
+    else if (pageNum === 0) setLoading(false);
+    else setLoadingMore(false);
+  }, []);
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore && !loading) {
+      fetchBooks(false, page + 1);
+    }
+  }, [loadingMore, hasMore, loading, page, fetchBooks]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchBooks();
-    }, [])
+      fetchBooks(false, 0);
+    }, [fetchBooks])
   );
 
   const openBook = (book: BookItem) => {
@@ -120,7 +160,7 @@ export default function BooksScreen() {
         </Text>
         <View style={styles.heroStats}>
           <View style={styles.heroStatItem}>
-            <Text style={styles.heroStatNum}>{books.length}</Text>
+            <Text style={styles.heroStatNum}>{totalBooks}</Text>
             <Text style={styles.heroStatLabel}>Total Buku</Text>
           </View>
           <View style={styles.heroStatDivider} />
@@ -145,6 +185,19 @@ export default function BooksScreen() {
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => fetchBooks(true, 0)} tintColor="#0f172a" />
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#64748b" />
+                <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>Memuat lebih banyak...</Text>
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <View style={styles.emptyIconWrap}>

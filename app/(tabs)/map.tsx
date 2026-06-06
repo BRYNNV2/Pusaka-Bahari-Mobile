@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useState, useEffect, useCallback } from 'react';
 import { ActivityIndicator, Dimensions, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -56,9 +56,17 @@ export default function MapScreen() {
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation={true}
-        mapType="standard"
+        mapType={Platform.OS == "android" ? "none" : "standard"}
         showsCompass={false}
       >
+        {Platform.OS === 'android' && (
+          <UrlTile
+            urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+            maximumZ={19}
+            flipY={false}
+          />
+        )}
+
         {tourRoute.length >= 2 && (
           <Polyline
             coordinates={tourRoute}

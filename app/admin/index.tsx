@@ -23,17 +23,18 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import MapView, { Marker, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, MapPressEvent, UrlTile } from 'react-native-maps';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type TabId = 'artifacts' | 'catalogs' | 'locations' | 'gallery' | 'agenda' | 'books';
+type TabId = 'dashboard' | 'artifacts' | 'catalogs' | 'gallery' | 'agenda' | 'books';
 
 const TABS: { id: TabId; label: string; icon: string; table: string }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'grid',      table: ''               },
   { id: 'artifacts', label: 'Artefak',  icon: 'archive',  table: 'artifacts'      },
   { id: 'catalogs',  label: 'Katalog',  icon: 'book',     table: 'catalogs'       },
-  { id: 'locations', label: 'Lokasi',   icon: 'map-pin',  table: 'map_locations'  },
   { id: 'gallery',   label: 'Galeri',   icon: 'image',    table: 'gallery_items'  },
   { id: 'agenda',    label: 'Agenda',   icon: 'calendar', table: 'agenda'         },
   { id: 'books',     label: 'Buku',     icon: 'book-open', table: 'books'          },
@@ -46,14 +47,14 @@ export default function AdminPanel() {
   const router = useRouter();
   const { user, logout } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<TabId>('artifacts');
+  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [data, setData]           = useState<any[]>([]);
   const [loading, setLoading]     = useState(false);
   const [saving, setSaving]       = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem]   = useState<any | null>(null);
   const [stats, setStats]               = useState<Record<TabId, number>>({
-    artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0, books: 0,
+    dashboard: 0, artifacts: 0, catalogs: 0, gallery: 0, agenda: 0, books: 0,
   });
 
   // ── Form Fields ──────────────────────────────────────────────────────────────
@@ -83,11 +84,6 @@ export default function AdminPanel() {
   const [uploadingGalleryItem, setUploadingGalleryItem] = useState(false);
   const [pendingGalleryItem, setPendingGalleryItem] = useState<{ uri: string, type: 'image'|'audio', ext: string, title: string, desc: string, lyrics: string } | null>(null);
   const [editingGalleryItem, setEditingGalleryItem] = useState<any | null>(null);
-  // Locations
-  const [lTitle, setLTitle] = useState('');
-  const [lDesc,  setLDesc]  = useState('');
-  const [lLat,   setLLat]   = useState('');
-  const [lLng,   setLLng]   = useState('');
   // Gallery (standalone tab)
   const [gTitle, setGTitle] = useState('');
   const [gDesc,  setGDesc]  = useState('');
@@ -97,6 +93,8 @@ export default function AdminPanel() {
   const [gImageUrl, setGImageUrl] = useState<string | null>(null);
   const [uploadingGImg, setUploadingGImg] = useState(false);
   const [gLyrics, setGLyrics] = useState('');
+  const [gVideoUrl, setGVideoUrl] = useState('');
+  const [gMediaType, setGMediaType] = useState<'photo' | 'video' | 'audio'>('photo');
   // Agenda
   const [agTitle, setAgTitle] = useState('');
   const [agDesc,  setAgDesc]  = useState('');
@@ -129,6 +127,10 @@ export default function AdminPanel() {
   const currentTab = TABS.find(t => t.id === activeTab)!;
 
   const fetchData = useCallback(async () => {
+    if (activeTab === 'dashboard') {
+      setData([]);
+      return;
+    }
     setLoading(true);
     const { data: rows } = await supabase
       .from(currentTab.table)
@@ -136,16 +138,17 @@ export default function AdminPanel() {
       .order('id', { ascending: false });
     setData(rows ?? []);
     setLoading(false);
-  }, [activeTab]);
+  }, [activeTab, currentTab]);
 
   const fetchStats = useCallback(async () => {
+    const dataTabs = TABS.filter(t => t.id !== 'dashboard');
     const results = await Promise.all(
-      TABS.map(tab =>
+      dataTabs.map(tab =>
         supabase.from(tab.table).select('id', { count: 'exact', head: true })
       )
     );
-    const newStats: Record<TabId, number> = { artifacts: 0, catalogs: 0, locations: 0, gallery: 0, agenda: 0, books: 0 };
-    TABS.forEach((tab, i) => {
+    const newStats: Record<TabId, number> = { dashboard: 0, artifacts: 0, catalogs: 0, gallery: 0, agenda: 0, books: 0 };
+    dataTabs.forEach((tab, i) => {
       newStats[tab.id] = results[i].count ?? 0;
     });
     setStats(newStats);
@@ -308,8 +311,8 @@ export default function AdminPanel() {
         .from('gallery_items')
         .update({
           title: editingGalleryItem.title.trim(),
-          description: editingGalleryItem.description.trim(),
-          lyrics: editingGalleryItem.lyrics?.trim() || null,
+          description: editingGalleryItem.description?.trim() || '',
+          lyrics: editingGalleryItem.lyrics?.trim() || '',
           image_url: newImageUrl,
         })
         .eq('id', editingGalleryItem.id);
@@ -329,8 +332,7 @@ export default function AdminPanel() {
     setAType('Artefak'); setAName(''); setAYear(''); setADesc(''); setAOpenHours(''); setAImageUri(null); setAImageUrl(null); setALat(null); setALng(null);
     setArtifactGallery([]);
     setCType('Benda'); setCName(''); setCYear(''); setCLocation(''); setCDesc(''); setCImageUri(null); setCImageUrl(null);
-    setLTitle(''); setLDesc(''); setLLat(''); setLLng('');
-    setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null); setGLyrics('');
+    setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null); setGLyrics(''); setGVideoUrl(''); setGMediaType('photo');
     setAgTitle(''); setAgDesc(''); setAgDate(''); setAgImageUri(null); setAgImageUrl(null);
     setMTitle(''); setMDesc(''); setMAudioUrl(null); setMAudioUri(null); setMImageUrl(null); setMImageUri(null); setMLyrics('');
     setBTitle(''); setBAuthor(''); setBDesc(''); setBCoverUri(null); setBCoverUrl(null); setBFileUrl(null); setBFileType('pdf');
@@ -353,14 +355,15 @@ export default function AdminPanel() {
       setCYear(item.year ?? '');      setCLocation(item.location ?? ''); 
       setCDesc(item.description ?? '');
       setCImageUri(item.image_url ?? null); setCImageUrl(item.image_url ?? null);
-    } else if (activeTab === 'locations') {
-      setLTitle(item.title ?? '');     setLDesc(item.description ?? '');
-      setLLat(String(item.latitude ?? '')); setLLng(String(item.longitude ?? ''));
     } else if (activeTab === 'gallery') {
       setGTitle(item.title ?? '');     setGDesc(item.description ?? '');
       setGAudio(item.audio_url ?? ''); setGOrder(String(item.sort_order ?? 0));
       setGImageUri(item.image_url ?? null); setGImageUrl(item.image_url ?? null);
       setGLyrics(item.lyrics ?? '');
+      setGVideoUrl(item.video_url ?? '');
+      if (item.audio_url) setGMediaType('audio');
+      else if (item.video_url) setGMediaType('video');
+      else setGMediaType('photo');
     } else if (activeTab === 'agenda') {
       setAgTitle(item.title ?? '');    setAgDesc(item.description ?? '');
       setAgDate(item.event_date ?? '');
@@ -399,24 +402,16 @@ export default function AdminPanel() {
         image_url: cImageUrl || null,
       };
     }
-    if (activeTab === 'locations') {
-      if (!lTitle.trim()) return null;
-      return { 
-        title: lTitle.trim(), 
-        description: lDesc.trim() || null, 
-        latitude: lLat.trim() ? parseFloat(lLat) : null, 
-        longitude: lLng.trim() ? parseFloat(lLng) : null 
-      };
-    }
     if (activeTab === 'gallery') {
       if (!gTitle.trim()) return null;
       return { 
         title: gTitle.trim(), 
-        description: gDesc.trim() || null, 
-        audio_url: gAudio.trim() || null, 
-        lyrics: gLyrics.trim() || null,
+        description: gDesc.trim() || '', 
+        audio_url: gAudio.trim() || '', 
+        lyrics: gLyrics.trim() || '',
         sort_order: gOrder.trim() ? parseInt(gOrder) : 0,
-        image_url: gImageUrl || null,
+        image_url: gImageUrl || '',
+        video_url: gVideoUrl.trim() || '',
       };
     }
     if (activeTab === 'agenda') {
@@ -476,11 +471,52 @@ export default function AdminPanel() {
 
       const { error } = await supabase.storage.from(bucket).upload(path, formData, { upsert: true });
       if (error) throw error;
+      
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+      setUrl(urlData.publicUrl);
+
+    } catch (e: any) {
+      Alert.alert('Gagal Upload', e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const pickAndUploadVideo = async (
+    bucket: string,
+    folder: string,
+    setUrl: (u: string) => void,
+    setUploading: (b: boolean) => void,
+  ) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return Alert.alert('Izin Ditolak', 'Butuh izin akses galeri video.');
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+      const uri = result.assets[0].uri;
+      setUploading(true);
+
+      const ext  = uri.split('.').pop()?.toLowerCase() || 'mp4';
+      const path = `${folder}/vid_${Date.now()}.${ext}`;
+      const formData = new FormData();
+      formData.append('files', {
+        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        name: `upload_${Date.now()}.${ext}`,
+        type: `video/${ext}`,
+      } as any);
+
+      const { error } = await supabase.storage.from(bucket).upload(path, formData, { upsert: true });
+      if (error) throw error;
 
       const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
       setUrl(urlData.publicUrl);
     } catch (e: any) {
-      Alert.alert('Gagal Upload', e.message);
+      Alert.alert('Gagal Upload Video', e.message);
     } finally {
       setUploading(false);
     }
@@ -518,7 +554,6 @@ export default function AdminPanel() {
         const notifTypeMap: Record<string, string> = {
           artifacts: 'artifact',
           catalogs: 'catalog',
-          locations: 'info',
           gallery: 'info',
           agenda: 'agenda',
           books: 'catalog',
@@ -526,7 +561,6 @@ export default function AdminPanel() {
         const notifMessageMap: Record<string, string> = {
           artifacts: `Artefak baru "${notifTitle}" telah ditambahkan ke koleksi.`,
           catalogs: `Katalog baru "${notifTitle}" telah tersedia.`,
-          locations: `Lokasi baru "${notifTitle}" telah ditandai.`,
           gallery: `Media galeri baru "${notifTitle}" telah diunggah.`,
           agenda: `Agenda baru "${notifTitle}" telah dijadwalkan.`,
           books: `Buku baru "${notifTitle}" telah ditambahkan ke perpustakaan.`,
@@ -584,13 +618,6 @@ export default function AdminPanel() {
         </View>
         <Text style={styles.itemTitle}>{item.name}</Text>
         <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
-      </>
-    );
-    if (activeTab === 'locations') return (
-      <>
-        <Text style={styles.itemTitle}>{item.title}</Text>
-        <Text style={styles.itemDesc} numberOfLines={1}>{item.description}</Text>
-        <Text style={styles.metaText}>📍 {item.latitude}, {item.longitude}</Text>
       </>
     );
     if (activeTab === 'gallery') return (
@@ -748,8 +775,15 @@ export default function AdminPanel() {
               setALat(latitude);
               setALng(longitude);
             }}
-            mapType="standard"
+            mapType={Platform.OS === 'android' ? 'none' : 'standard'}
           >
+            {Platform.OS === 'android' && (
+              <UrlTile
+                urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                maximumZ={19}
+                flipY={false}
+              />
+            )}
             {aLat !== null && aLng !== null && (
               <Marker coordinate={{ latitude: aLat, longitude: aLng }}>
                 <View style={styles.mapPickerMarker}>
@@ -1014,90 +1048,156 @@ export default function AdminPanel() {
       </>
     );
 
-    if (activeTab === 'locations') return (
-      <>
-        <Text style={styles.formLabel}>Nama Lokasi <Text style={styles.required}>*</Text></Text>
-        <TextInput style={styles.formInput} value={lTitle} onChangeText={setLTitle} placeholder="Nama lokasi..." placeholderTextColor="#94a3b8" />
-        <Text style={styles.formLabel}>Deskripsi</Text>
-        <TextInput style={[styles.formInput, styles.formTextarea]} value={lDesc} onChangeText={setLDesc} placeholder="Deskripsi lokasi..." placeholderTextColor="#94a3b8" multiline numberOfLines={3} textAlignVertical="top" />
-        <Text style={styles.formLabel}>Latitude</Text>
-        <TextInput style={styles.formInput} value={lLat} onChangeText={setLLat} placeholder="cth: 0.9250" placeholderTextColor="#94a3b8" keyboardType="numeric" />
-        <Text style={styles.formLabel}>Longitude</Text>
-        <TextInput style={styles.formInput} value={lLng} onChangeText={setLLng} placeholder="cth: 104.4168" placeholderTextColor="#94a3b8" keyboardType="numeric" />
-      </>
-    );
+
 
     if (activeTab === 'gallery') return (
       <>
+        <Text style={styles.formLabel}>Pilih Tipe Media</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          {(['photo', 'video', 'audio'] as const).map(type => (
+            <TouchableOpacity 
+              key={type}
+              style={{
+                flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8,
+                backgroundColor: gMediaType === type ? '#8B5E3C' : '#f1f5f9',
+                borderWidth: 1, borderColor: gMediaType === type ? '#8B5E3C' : '#e2e8f0'
+              }}
+              onPress={() => setGMediaType(type)}
+            >
+              <Text style={{
+                fontSize: 13, fontWeight: '600',
+                color: gMediaType === type ? '#ffffff' : '#64748b'
+              }}>
+                {type === 'photo' ? 'Foto' : type === 'video' ? 'Video' : 'Audio'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <Text style={styles.formLabel}>Judul <Text style={styles.required}>*</Text></Text>
         <TextInput style={styles.formInput} value={gTitle} onChangeText={setGTitle} placeholder="Judul item galeri..." placeholderTextColor="#94a3b8" />
         <Text style={styles.formLabel}>Deskripsi</Text>
         <TextInput style={[styles.formInput, styles.formTextarea]} value={gDesc} onChangeText={setGDesc} placeholder="Deskripsi..." placeholderTextColor="#94a3b8" multiline numberOfLines={3} textAlignVertical="top" />
 
-        <Text style={styles.formLabel}>Foto Galeri</Text>
-        <TouchableOpacity
-          style={styles.imgPicker}
-          activeOpacity={0.8}
-          onPress={() => pickAndUploadImage('gallery', 'items', setGImageUri, setGImageUrl, setUploadingGImg)}
-        >
-          {gImageUri ? (
-            <Image source={{ uri: gImageUri }} style={styles.imgPreview} resizeMode="cover" />
-          ) : (
-            <View style={styles.imgPlaceholder}>
-              <Feather name="image" size={28} color="#94a3b8" />
-              <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih foto</Text>
-            </View>
-          )}
-          {uploadingGImg && (
-            <View style={styles.imgOverlay}>
-              <ActivityIndicator color="#ffffff" />
-              <Text style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Mengupload...</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        {gImageUrl && <Text style={styles.imgSuccess}>✓ Foto berhasil diupload</Text>}
+        {gMediaType === 'photo' && (
+          <>
+            <Text style={styles.formLabel}>Foto Galeri</Text>
+            <TouchableOpacity
+              style={styles.imgPicker}
+              activeOpacity={0.8}
+              onPress={() => pickAndUploadImage('gallery', 'items', setGImageUri, setGImageUrl, setUploadingGImg)}
+            >
+              {gImageUri ? (
+                <Image source={{ uri: gImageUri }} style={styles.imgPreview} resizeMode="cover" />
+              ) : (
+                <View style={styles.imgPlaceholder}>
+                  <Feather name="image" size={28} color="#94a3b8" />
+                  <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih foto</Text>
+                </View>
+              )}
+              {uploadingGImg && (
+                <View style={styles.imgOverlay}>
+                  <ActivityIndicator color="#ffffff" />
+                  <Text style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Mengupload...</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {gImageUrl && <Text style={styles.imgSuccess}>✓ Foto berhasil diupload</Text>}
+          </>
+        )}
 
-        <Text style={styles.formLabel}>File Audio (MP3)</Text>
-        <TouchableOpacity
-          style={[styles.imgPicker, { minHeight: 60 }]}
-          activeOpacity={0.8}
-          onPress={async () => {
-            try {
-              const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
-              if (res.canceled || !res.assets[0]) return;
-              setUploadingGImg(true);
-              const uri = res.assets[0].uri;
-              const ext = res.assets[0].name.split('.').pop()?.toLowerCase() || 'mp3';
-              const path = `gallery_audio/${Date.now()}.${ext}`;
-              const formData = new FormData();
-              formData.append('files', {
-                uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
-                name: `audio_${Date.now()}.${ext}`,
-                type: `audio/${ext}`,
-              } as any);
-              const { error } = await supabase.storage.from('gallery').upload(path, formData, { upsert: true });
-              if (error) throw error;
-              const { data } = supabase.storage.from('gallery').getPublicUrl(path);
-              setGAudio(data.publicUrl);
-              Alert.alert('Berhasil', 'Audio berhasil diunggah.');
-            } catch (e: any) {
-              Alert.alert('Gagal Upload Audio', e.message);
-            } finally {
-              setUploadingGImg(false);
-            }
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Feather name="music" size={20} color="#94a3b8" />
-            <Text style={{ color: '#64748b', flex: 1 }}>
-              {gAudio ? '✓ Audio sudah diunggah. Ketuk untuk ganti.' : 'Ketuk untuk pilih file audio'}
-            </Text>
-          </View>
-          {uploadingGImg && <ActivityIndicator color="#0f172a" style={{ position: 'absolute', right: 20 }} />}
-        </TouchableOpacity>
-        
-        <Text style={styles.formLabel}>Lirik / Teks Narasi (Opsional)</Text>
-        <TextInput style={[styles.formInput, styles.formTextarea]} value={gLyrics} onChangeText={setGLyrics} placeholder="Paste lirik di sini..." placeholderTextColor="#94a3b8" multiline numberOfLines={4} textAlignVertical="top" />
+        {gMediaType === 'video' && (
+          <>
+            <Text style={styles.formLabel}>Sampul Video (Thumbnail)</Text>
+            <TouchableOpacity
+              style={styles.imgPicker}
+              activeOpacity={0.8}
+              onPress={() => pickAndUploadImage('gallery', 'items', setGImageUri, setGImageUrl, setUploadingGImg)}
+            >
+              {gImageUri ? (
+                <Image source={{ uri: gImageUri }} style={styles.imgPreview} resizeMode="cover" />
+              ) : (
+                <View style={styles.imgPlaceholder}>
+                  <Feather name="image" size={28} color="#94a3b8" />
+                  <Text style={styles.imgPlaceholderText}>Ketuk untuk pilih sampul video</Text>
+                </View>
+              )}
+              {uploadingGImg && (
+                <View style={styles.imgOverlay}>
+                  <ActivityIndicator color="#ffffff" />
+                  <Text style={{ color: '#fff', fontSize: 12, marginTop: 6 }}>Mengupload...</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {gImageUrl && <Text style={styles.imgSuccess}>✓ Sampul berhasil diupload</Text>}
+
+            <Text style={styles.formLabel}>Video (Link YouTube atau Upload MP4)</Text>
+            <TextInput 
+              style={styles.formInput} 
+              value={gVideoUrl} 
+              onChangeText={setGVideoUrl} 
+              placeholder="Paste Link YouTube (https://...) atau" 
+              placeholderTextColor="#94a3b8" 
+            />
+            <TouchableOpacity 
+              style={[styles.addGalleryBtn, { marginTop: 4, marginBottom: 12 }]}
+              onPress={() => pickAndUploadVideo('gallery', 'videos', setGVideoUrl, setUploadingGImg)}
+            >
+              <Feather name="video" size={18} color="#0f172a" />
+              <Text style={styles.addGalleryBtnText}>Upload File MP4</Text>
+            </TouchableOpacity>
+            {gVideoUrl && gVideoUrl.includes('supabase') && (
+              <Text style={[styles.imgSuccess, { marginTop: -8 }]}>✓ Video MP4 diupload</Text>
+            )}
+            {uploadingGImg && <Text style={{ color: '#3b82f6', fontSize: 12, marginTop: -8 }}>Mengupload video...</Text>}
+          </>
+        )}
+
+        {gMediaType === 'audio' && (
+          <>
+            <Text style={styles.formLabel}>File Audio (MP3)</Text>
+            <TouchableOpacity
+              style={[styles.imgPicker, { minHeight: 60 }]}
+              activeOpacity={0.8}
+              onPress={async () => {
+                try {
+                  const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
+                  if (res.canceled || !res.assets[0]) return;
+                  setUploadingGImg(true);
+                  const uri = res.assets[0].uri;
+                  const ext = res.assets[0].name.split('.').pop()?.toLowerCase() || 'mp3';
+                  const path = `gallery_audio/${Date.now()}.${ext}`;
+                  const formData = new FormData();
+                  formData.append('files', {
+                    uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+                    name: `audio_${Date.now()}.${ext}`,
+                    type: `audio/${ext}`,
+                  } as any);
+                  const { error } = await supabase.storage.from('gallery').upload(path, formData, { upsert: true });
+                  if (error) throw error;
+                  const { data } = supabase.storage.from('gallery').getPublicUrl(path);
+                  setGAudio(data.publicUrl);
+                  Alert.alert('Berhasil', 'Audio berhasil diunggah.');
+                } catch (e: any) {
+                  Alert.alert('Gagal Upload Audio', e.message);
+                } finally {
+                  setUploadingGImg(false);
+                }
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Feather name="music" size={20} color="#94a3b8" />
+                <Text style={{ color: '#64748b', flex: 1 }}>
+                  {gAudio ? '✓ Audio sudah diunggah. Ketuk untuk ganti.' : 'Ketuk untuk pilih file audio'}
+                </Text>
+              </View>
+              {uploadingGImg && <ActivityIndicator color="#0f172a" style={{ position: 'absolute', right: 20 }} />}
+            </TouchableOpacity>
+
+            <Text style={styles.formLabel}>Lirik/Syair (Opsional)</Text>
+            <TextInput style={[styles.formInput, styles.formTextarea, { minHeight: 80 }]} value={gLyrics} onChangeText={setGLyrics} placeholder="Paste lirik di sini..." placeholderTextColor="#94a3b8" multiline numberOfLines={4} textAlignVertical="top" />
+          </>
+        )}
 
         <Text style={styles.formLabel}>Urutan Tampil</Text>
         <TextInput style={styles.formInput} value={gOrder} onChangeText={setGOrder} placeholder="0" placeholderTextColor="#94a3b8" keyboardType="numeric" />
@@ -1259,14 +1359,62 @@ export default function AdminPanel() {
         </ScrollView>
 
         {/* ── Section Label ── */}
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionLabel}>Daftar {currentTab.label}</Text>
-          <Text style={styles.sectionCount}>{data.length} item</Text>
-        </View>
+        {activeTab !== 'dashboard' && (
+          <View style={styles.sectionRow}>
+            <Text style={styles.sectionLabel}>Daftar {currentTab.label}</Text>
+            <Text style={styles.sectionCount}>{data.length} item</Text>
+          </View>
+        )}
       </SafeAreaView>
 
-      {/* ── List ── */}
-      {loading ? (
+      {/* ── Main Content ── */}
+      {activeTab === 'dashboard' ? (
+        <ScrollView contentContainerStyle={styles.dashboardContainer} showsVerticalScrollIndicator={false}>
+          <Text style={styles.dashTitle}>Ringkasan Sistem</Text>
+          <View style={styles.dashGrid}>
+            {TABS.filter(t => t.id !== 'dashboard').map(tab => (
+              <View key={tab.id} style={styles.dashCard}>
+                <View style={styles.dashCardIcon}>
+                  <Feather name={tab.icon as any} size={22} color="#8B5E3C" />
+                </View>
+                <Text style={styles.dashCardCount}>{stats[tab.id]}</Text>
+                <Text style={styles.dashCardLabel}>Total {tab.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.dashChartSection}>
+            <Text style={styles.dashTitle}>Proporsi Data Sistem</Text>
+            <View style={{ marginTop: 10, gap: 16 }}>
+              {TABS.filter(t => t.id !== 'dashboard').map(tab => {
+                const maxVal = Math.max(...TABS.filter(t => t.id !== 'dashboard').map(t => stats[t.id] || 0), 1);
+                const widthPct = ((stats[tab.id] || 0) / maxVal) * 100;
+                return (
+                  <View key={tab.id} style={{ flexDirection: 'column', gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: '#fdfbf7', alignItems: 'center', justifyContent: 'center' }}>
+                          <Feather name={tab.icon as any} size={12} color="#8B5E3C" />
+                        </View>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155' }}>{tab.label}</Text>
+                      </View>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>{stats[tab.id]}</Text>
+                    </View>
+                    <View style={{ width: '100%', height: 10, backgroundColor: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                      <LinearGradient
+                        colors={['#d4af37', '#8B5E3C']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={{ width: `${widthPct}%`, height: '100%', borderRadius: 5 }}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </ScrollView>
+      ) : loading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color="#0f172a" />
           <Text style={styles.loadingText}>Memuat data...</Text>
@@ -1289,9 +1437,11 @@ export default function AdminPanel() {
       )}
 
       {/* ── FAB ── */}
-      <TouchableOpacity style={styles.fab} onPress={openAdd} activeOpacity={0.85}>
-        <Feather name="plus" size={26} color="white" />
-      </TouchableOpacity>
+      {activeTab !== 'dashboard' && (
+        <TouchableOpacity style={styles.fab} onPress={openAdd} activeOpacity={0.85}>
+          <Feather name="plus" size={26} color="white" />
+        </TouchableOpacity>
+      )}
 
       {/* ── Add / Edit Modal ── */}
       <Modal
@@ -1364,6 +1514,22 @@ const styles = StyleSheet.create({
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
   sectionLabel: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
   sectionCount: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
+
+  // Dashboard Overview
+  dashboardContainer: { padding: 20, paddingBottom: 100 },
+  dashTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 16 },
+  dashGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 14 },
+  dashCard: { width: (SCREEN_WIDTH - 54) / 2, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#f1f5f9' },
+  dashCardIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fdfbf7', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  dashCardCount: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 2 },
+  dashCardLabel: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  dashChartSection: { marginTop: 32, backgroundColor: '#ffffff', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#f1f5f9' },
+  chartContainer: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 180, marginTop: 10, paddingBottom: 24 },
+  chartBarWrapper: { alignItems: 'center', width: 45, height: '100%', justifyContent: 'flex-end' },
+  chartVal: { fontSize: 11, fontWeight: '700', color: '#0f172a', marginBottom: 6 },
+  chartBarBg: { width: 32, flex: 1, backgroundColor: '#f1f5f9', borderRadius: 8, justifyContent: 'flex-end', overflow: 'hidden' },
+  chartBarFill: { width: '100%', backgroundColor: '#0f172a', borderRadius: 8 },
+  chartLabel: { fontSize: 10, fontWeight: '600', color: '#64748b', marginTop: 8, position: 'absolute', bottom: 0 },
 
   // List
   listContent: { paddingHorizontal: 20, paddingBottom: 120, paddingTop: 4 },

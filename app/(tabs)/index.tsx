@@ -177,13 +177,19 @@ export default function HomeScreen() {
           
           {/* 1. Header Row */}
           <View style={styles.headerRow}>
-            <View style={styles.locationGroup}>
-              <View style={styles.mapIconWrap}>
-                <Ionicons name="location-outline" size={24} color="#0f172a" />
-              </View>
-              <View style={styles.locationPill}>
-                <Text style={styles.locationText}>Penyengat, Kepri</Text>
-              </View>
+            <View style={styles.greetingGroup}>
+              <Text style={styles.greetingTime}>
+                {(() => {
+                  const hour = new Date().getHours();
+                  if (hour < 11) return 'Selamat Pagi 🌅';
+                  if (hour < 15) return 'Selamat Siang ☀️';
+                  if (hour < 18) return 'Selamat Sore 🌇';
+                  return 'Selamat Malam 🌙';
+                })()}
+              </Text>
+              <Text style={styles.greetingName} numberOfLines={1}>
+                {isLoggedIn ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Pengguna') : 'Jelajahi Warisan Budaya'}
+              </Text>
             </View>
 
             <View style={styles.headerRightActions}>
@@ -437,7 +443,7 @@ export default function HomeScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Premium Pop-up Modal Agenda Mendatang */}
+      {/* Full-Screen Poster Modal Agenda Mendatang */}
       <Modal
         visible={showAgendaModal}
         transparent={true}
@@ -448,75 +454,71 @@ export default function HomeScreen() {
         }}
       >
         <View style={styles.modalOverlayPremium}>
-          <Animated.View style={[styles.modalContentPremium, { transform: [{ scale: 1 }] }]}>
-            
-            {agendaData.length > 0 && (
-              <View style={{ width: '100%' }}>
-                {/* Header / Poster Banner */}
-                <View style={styles.modalPosterWrap}>
-                  {agendaData[0].image_url ? (
-                    <Image source={{ uri: agendaData[0].image_url }} style={styles.modalPosterImg} resizeMode="cover" />
-                  ) : (
-                    <LinearGradient colors={['#8B5E3C', '#5c4033']} style={styles.modalPosterImg} />
-                  )}
-                  
-                  {/* Floating Elements on Poster */}
-                  <LinearGradient colors={['rgba(0,0,0,0.6)', 'transparent', 'rgba(0,0,0,0.8)']} style={styles.modalPosterGradient} />
-                  
-                  <View style={styles.modalBadgeSegera}>
-                    <Ionicons name="sparkles" size={14} color="#fbbf24" />
-                    <Text style={styles.modalBadgeSegeraText}>SEGERA HADIR</Text>
-                  </View>
+          {agendaData.length > 0 && (
+            <View style={styles.posterModalContainer}>
+              {/* Poster Image - Full Area */}
+              <View style={styles.posterImageWrap}>
+                {agendaData[0].image_url ? (
+                  <Image source={{ uri: agendaData[0].image_url }} style={styles.posterFullImage} resizeMode="cover" />
+                ) : (
+                  <LinearGradient colors={['#1e293b', '#0f172a']} style={styles.posterFullImage}>
+                    <Ionicons name="calendar" size={64} color="rgba(255,255,255,0.15)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 12, fontWeight: '600' }}>Poster belum tersedia</Text>
+                  </LinearGradient>
+                )}
+                
+                {/* Gradient Overlay (hanya di bagian atas dan bawah untuk readability) */}
+                <LinearGradient 
+                  colors={['rgba(0,0,0,0.5)', 'transparent', 'transparent', 'rgba(0,0,0,0.7)']} 
+                  locations={[0, 0.2, 0.6, 1]}
+                  style={StyleSheet.absoluteFillObject} 
+                />
 
-                  <TouchableOpacity 
-                    onPress={() => {
-                      setShowAgendaModal(false);
-                      setShowFloatingAgenda(true);
-                    }} 
-                    style={styles.modalCloseBtnPremium}
-                  >
-                    <Feather name="x" size={20} color="#ffffff" />
-                  </TouchableOpacity>
+                {/* Close Button (kanan atas) */}
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowAgendaModal(false);
+                    setShowFloatingAgenda(true);
+                  }} 
+                  style={styles.posterCloseBtn}
+                >
+                  <Feather name="x" size={20} color="#ffffff" />
+                </TouchableOpacity>
 
-                  <View style={styles.modalPosterBottomText}>
-                    <Text style={styles.modalPremiumDate}>
-                      {new Date(agendaData[0].event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}
-                    </Text>
-                  </View>
+                {/* Badge Segera Hadir (kiri atas) */}
+                <View style={styles.modalBadgeSegera}>
+                  <Ionicons name="sparkles" size={14} color="#fbbf24" />
+                  <Text style={styles.modalBadgeSegeraText}>SEGERA HADIR</Text>
                 </View>
 
-                {/* Body Content */}
-                <View style={styles.modalBodyPremium}>
-                  <Text style={styles.modalPremiumTitle} numberOfLines={2}>{agendaData[0].title}</Text>
-                  
-                  {agendaData[0].description && (
-                    <Text style={styles.modalPremiumDesc} numberOfLines={3}>
-                      {agendaData[0].description}
-                    </Text>
+                {/* Info di Bawah Poster */}
+                <View style={styles.posterBottomInfo}>
+                  {agendaData[0].event_date && (
+                    <View style={styles.posterDateBadge}>
+                      <Feather name="calendar" size={12} color="#fbbf24" />
+                      <Text style={styles.posterDateText}>
+                        {new Date(agendaData[0].event_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </Text>
+                    </View>
                   )}
-                  
-                  {/* Action Button */}
-                  <TouchableOpacity 
-                    activeOpacity={0.8}
-                    style={styles.modalActionBtnPremiumWrap}
-                    onPress={() => {
-                      setShowAgendaModal(false);
-                      router.push('/agenda');
-                    }}
-                  >
-                    <LinearGradient 
-                      colors={['#1e293b', '#0f172a']} 
-                      style={styles.modalActionBtnPremium}
-                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    >
-                      <Text style={styles.modalActionBtnTextPremium}>Lihat Detail Acara</Text>
-                      <Feather name="arrow-right" size={18} color="#ffffff" />
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  <Text style={styles.posterTitle} numberOfLines={2}>{agendaData[0].title}</Text>
                 </View>
               </View>
-            )}
-          </Animated.View>
+
+              {/* CTA Button di Luar Poster */}
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                style={styles.posterCTABtn}
+                onPress={() => {
+                  setShowAgendaModal(false);
+                  router.push('/agenda');
+                }}
+              >
+                <Text style={styles.posterCTAText}>Lihat Detail Acara</Text>
+                <Feather name="arrow-right" size={16} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -564,23 +566,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  locationGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  greetingGroup: {
+    flex: 1,
+    marginRight: 12,
   },
-  mapIconWrap: {
-    marginRight: 6,
+  greetingTime: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  locationPill: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  locationText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
+  greetingName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: -0.5,
   },
   headerRightActions: {
     flexDirection: 'row',
@@ -716,124 +716,122 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontWeight: '500',
   },
-  // Premium Modal Popup Agenda
+  // Full-Screen Poster Modal Agenda
   modalOverlayPremium: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
-  modalContentPremium: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
+  posterModalContainer: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 340,
+    alignItems: 'center',
+  },
+  posterImageWrap: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.25,
-    shadowRadius: 30,
-    elevation: 20,
-  },
-  modalPosterWrap: {
-    width: '100%',
-    height: 160,
     position: 'relative',
     backgroundColor: '#0f172a',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.4,
+    shadowRadius: 25,
+    elevation: 25,
   },
-  modalPosterImg: {
+  posterFullImage: {
     width: '100%',
     height: '100%',
-  },
-  modalPosterGradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalBadgeSegera: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
   },
-  modalBadgeSegeraText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  modalCloseBtnPremium: {
+  posterCloseBtn: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: 14,
+    right: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.25)',
   },
-  modalPosterBottomText: {
+  modalBadgeSegera: {
     position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.3)',
   },
-  modalPremiumDate: {
+  modalBadgeSegeraText: {
+    color: '#fbbf24',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  posterBottomInfo: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 18,
+  },
+  posterDateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  posterDateText: {
     color: '#fbbf24',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
-  modalBodyPremium: {
-    padding: 20,
-    paddingTop: 16,
-  },
-  modalPremiumTitle: {
-    fontSize: 18,
+  posterTitle: {
+    color: '#ffffff',
+    fontSize: 20,
     fontWeight: '800',
-    color: '#0f172a',
-    marginBottom: 6,
-    lineHeight: 24,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
+    lineHeight: 26,
   },
-  modalPremiumDesc: {
-    fontSize: 13,
-    color: '#64748b',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  modalActionBtnPremiumWrap: {
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  modalActionBtnPremium: {
+  posterCTABtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 14,
     gap: 8,
+    backgroundColor: '#0f172a',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    marginTop: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  modalActionBtnTextPremium: {
+  posterCTAText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   // Floating Widget (Mini Banner)
   floatingWidgetContainer: {
