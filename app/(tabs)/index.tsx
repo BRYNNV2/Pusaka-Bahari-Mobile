@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +19,8 @@ const HERO_IMAGES = [
 ];
 
 export default function HomeScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { isLoggedIn, user, isAdmin } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -163,15 +166,13 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <ScrollView 
           bounces={true} 
           showsVerticalScrollIndicator={false} 
           contentContainerStyle={styles.scrollContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#8B5E3C" colors={['#8B5E3C']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
           }
         >
           
@@ -194,7 +195,7 @@ export default function HomeScreen() {
 
             <View style={styles.headerRightActions}>
               <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
-                <Feather name="bell" size={20} color="#0f172a" />
+                <Feather name="bell" size={20} color={colors.text} />
                 {unreadCount > 0 && (
                   <View style={styles.bellBadge}>
                     <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -210,7 +211,7 @@ export default function HomeScreen() {
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
                 ) : (
-                  <Feather name="user" size={20} color="#64748b" />
+                  <Feather name="user" size={20} color={colors.textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
@@ -258,7 +259,7 @@ export default function HomeScreen() {
             {/* Hero Content Overlay */}
             <View style={styles.heroOverlay}>
               <View style={styles.heroBadge}>
-                <Ionicons name="compass" size={13} color="#fff" />
+                <Ionicons name="compass" size={13} color={colors.background} />
                 <Text style={styles.heroBadgeText}>Jelajahi Sekarang</Text>
               </View>
               <Text style={styles.heroTitle}>Temukan Warisan{"\n"}Raja Ali Haji</Text>
@@ -301,7 +302,7 @@ export default function HomeScreen() {
 
           {/* 3. Search Bar */}
           <View style={styles.searchContainer}>
-            <Feather name="search" size={20} color="#64748b" style={styles.searchIcon} />
+            <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
             <TextInput 
               style={styles.searchInput}
               placeholder="Cari naskah, artefak, atau sejarah..."
@@ -311,11 +312,11 @@ export default function HomeScreen() {
             />
             {searchQuery.length > 0 ? (
               <TouchableOpacity style={styles.filterBtn} onPress={() => setSearchQuery('')}>
-                <Feather name="x" size={20} color="#ef4444" />
+                <Feather name="x" size={20} color={colors.danger} />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={styles.filterBtn}>
-                <Ionicons name="options-outline" size={20} color="#0f172a" />
+                <Ionicons name="options-outline" size={20} color={colors.text} />
               </TouchableOpacity>
             )}
           </View>
@@ -355,7 +356,7 @@ export default function HomeScreen() {
             {categories.map((item, index) => {
               const isActive = activeCategory === item;
               const iconConfig = CATEGORY_ICONS[item];
-              const iconColor = isActive ? '#ffffff' : '#5c4033';
+              const iconColor = isActive ? colors.background : colors.textSecondary;
               return (
                 <TouchableOpacity 
                   key={index} 
@@ -385,12 +386,12 @@ export default function HomeScreen() {
             <View style={styles.gridContainer}>
               {loadingContent ? (
                 <View style={{ width: '100%', padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: '#94a3b8' }}>Memuat data sejarah...</Text>
+                  <Text style={{ color: colors.textSecondary }}>Memuat data sejarah...</Text>
                 </View>
               ) : filteredArtifacts.length === 0 ? (
                 <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
-                  <Feather name={searchQuery ? "search" : "inbox"} size={32} color="#cbd5e1" style={{ marginBottom: 12 }} />
-                  <Text style={{ color: '#94a3b8', fontWeight: '500', textAlign: 'center' }}>
+                  <Feather name={searchQuery ? "search" : "inbox"} size={32} color={colors.textSecondary} style={{ marginBottom: 12 }} />
+                  <Text style={{ color: colors.textSecondary, fontWeight: '500', textAlign: 'center' }}>
                     {searchQuery 
                       ? `Tidak ada hasil untuk "${searchQuery}"` 
                       : 'Belum ada data untuk kategori ini.'}
@@ -417,7 +418,7 @@ export default function HomeScreen() {
 
                   <View style={styles.cardTopRow}>
                     <View style={styles.verifiedBadge}>
-                      <MaterialCommunityIcons name="shield-check" size={14} color="#fff" />
+                      <MaterialCommunityIcons name="shield-check" size={14} color="#ffffff" />
                     </View>
                     <View style={styles.tagPill}>
                       <Text style={styles.tagText}>{item.type}</Text>
@@ -431,7 +432,7 @@ export default function HomeScreen() {
                     </View>
                     <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
                     <View style={styles.cardLocationRow}>
-                      <Ionicons name="time-outline" size={12} color="#cbd5e1" />
+                      <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
                       <Text style={styles.cardLocationText} numberOfLines={1}>{item.year || 'Abad 19'}</Text>
                     </View>
                   </View>
@@ -461,7 +462,7 @@ export default function HomeScreen() {
                 {agendaData[0].image_url ? (
                   <Image source={{ uri: agendaData[0].image_url }} style={styles.posterFullImage} resizeMode="cover" />
                 ) : (
-                  <LinearGradient colors={['#1e293b', '#0f172a']} style={styles.posterFullImage}>
+                  <LinearGradient colors={['#1e293b', colors.text]} style={styles.posterFullImage}>
                     <Ionicons name="calendar" size={64} color="rgba(255,255,255,0.15)" />
                     <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 12, fontWeight: '600' }}>Poster belum tersedia</Text>
                   </LinearGradient>
@@ -515,7 +516,7 @@ export default function HomeScreen() {
                 }}
               >
                 <Text style={styles.posterCTAText}>Lihat Detail Acara</Text>
-                <Feather name="arrow-right" size={16} color="#ffffff" />
+                <Feather name="arrow-right" size={16} color={colors.background} />
               </TouchableOpacity>
             </View>
           )}
@@ -537,7 +538,7 @@ export default function HomeScreen() {
             />
             
             <TouchableOpacity onPress={() => setShowFloatingAgenda(false)} style={styles.floatingWidgetClose}>
-              <Feather name="x" size={12} color="#fff" />
+              <Feather name="x" size={12} color="#ffffff" />
             </TouchableOpacity>
           </TouchableOpacity>
         </Animated.View>
@@ -547,10 +548,10 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.background,
   },
   safeArea: {
     flex: 1,
@@ -572,14 +573,14 @@ const styles = StyleSheet.create({
   },
   greetingTime: {
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textSecondary,
     fontWeight: '600',
     marginBottom: 4,
   },
   greetingName: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
     letterSpacing: -0.5,
   },
   headerRightActions: {
@@ -591,9 +592,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -605,15 +606,15 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.danger,
     borderWidth: 2,
-    borderColor: '#ffffff',
+    borderColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
   bellBadgeText: {
-    color: '#ffffff',
+    color: colors.background,
     fontSize: 10,
     fontWeight: '800',
   },
@@ -621,7 +622,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -637,7 +638,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 20,
     position: 'relative',
-    backgroundColor: '#1e293b',
+    backgroundColor: colors.border,
   },
   heroOverlay: {
     position: 'absolute',
@@ -660,7 +661,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
   },
   heroBadgeText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 11,
     fontWeight: '700',
     marginLeft: 5,
@@ -693,13 +694,13 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     height: 56,
     borderRadius: 28,
     paddingHorizontal: 20,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: colors.border,
   },
   searchIcon: {
     marginRight: 12,
@@ -707,13 +708,13 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#0f172a',
+    color: colors.text,
     fontWeight: '500',
     height: '100%',
   },
   emptyText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   // Full-Screen Poster Modal Agenda
@@ -735,7 +736,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 15 },
     shadowOpacity: 0.4,
@@ -776,7 +777,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(251,191,36,0.3)',
   },
   modalBadgeSegeraText: {
-    color: '#fbbf24',
+    color: colors.primary,
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -800,12 +801,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   posterDateText: {
-    color: '#fbbf24',
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '700',
   },
   posterTitle: {
-    color: '#ffffff',
+    color: colors.background,
     fontSize: 20,
     fontWeight: '800',
     textShadowColor: 'rgba(0,0,0,0.6)',
@@ -818,7 +819,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 16,
@@ -828,7 +829,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
   },
   posterCTAText: {
-    color: '#ffffff',
+    color: colors.background,
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -886,11 +887,11 @@ const styles = StyleSheet.create({
   quickMenuBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.background,
     padding: 16,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -901,7 +902,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#fdf2e9',
+    backgroundColor: colors.backgroundSecondary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -912,12 +913,12 @@ const styles = StyleSheet.create({
   quickMenuBtnTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
   quickMenuBtnDesc: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textSecondary,
   },
   categoriesContainer: {
     paddingBottom: 24,
@@ -931,12 +932,12 @@ const styles = StyleSheet.create({
   quickMenuTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
   },
   quickMenuSeeAll: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#8B5E3C',
+    color: colors.primary,
   },
   agendaSectionWrapper: {
     marginBottom: 20,
@@ -946,9 +947,9 @@ const styles = StyleSheet.create({
   },
   agendaCardMini: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     borderRadius: 16,
     padding: 12,
     marginRight: 12,
@@ -963,9 +964,9 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -973,12 +974,12 @@ const styles = StyleSheet.create({
   agendaDayMini: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
   },
   agendaMonthMini: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#8B5E3C',
+    color: colors.primary,
     marginTop: 1,
   },
   agendaContentMini: {
@@ -988,12 +989,12 @@ const styles = StyleSheet.create({
   agendaTitleMini: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
   agendaDescMini: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textSecondary,
   },
   categoryPill: {
     flexDirection: 'row',
@@ -1001,23 +1002,23 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 18,
     paddingVertical: 10,
-    backgroundColor: '#f5f0eb',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 22,
     marginRight: 10,
     borderWidth: 1,
-    borderColor: '#e8ddd2',
+    borderColor: colors.border,
   },
   categoryPillActive: {
-    backgroundColor: '#3c2415',
-    borderColor: '#3c2415',
+    backgroundColor: colors.text,
+    borderColor: colors.text,
   },
   categoryText: {
-    color: '#5c4033',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
   categoryTextActive: {
-    color: '#ffffff',
+    color: colors.background,
   },
   contentSection: {
     flex: 1,
@@ -1025,7 +1026,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 16,
     letterSpacing: -0.5,
   },
@@ -1041,7 +1042,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
     position: 'relative',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
   },
   cardImage: {
     width: '100%',
@@ -1058,7 +1059,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   verifiedBadge: {
-    backgroundColor: '#8B5E3C', // Warm brown badge
+    backgroundColor: colors.primary, // Warm brown badge
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -1068,13 +1069,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   tagPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    // Add subtle frosted glass effect if possible:
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   tagText: {
     color: '#ffffff',
@@ -1101,13 +1101,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   ratingText: {
-    color: '#ffffff',
+    color: colors.background,
     fontSize: 10,
     fontWeight: '700',
     marginLeft: 4,
   },
   cardTitle: {
-    color: '#ffffff',
+    color: colors.background,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 4,
@@ -1117,7 +1117,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardLocationText: {
-    color: '#cbd5e1',
+    color: colors.textSecondary,
     fontSize: 11,
     marginLeft: 4,
     fontWeight: '500',

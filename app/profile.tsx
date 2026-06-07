@@ -17,9 +17,21 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import Animated, { 
+  FadeIn, 
+  SlideInDown, 
+  useSharedValue, 
+  useAnimatedStyle, 
+  useAnimatedScrollHandler, 
+  interpolate, 
+  Extrapolate,
+  withRepeat,
+  withTiming
+} from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
 
 const { width, height } = Dimensions.get('window');
@@ -37,6 +49,27 @@ type Profile = {
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, isLoggedIn, isAdmin, logout } = useAuth();
+  const { mode, isDark, colors, setMode } = useTheme();
+  
+  const styles = getStyles(colors, isDark);
+
+
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, 80],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    return {
+      opacity: opacity,
+    };
+  });
 
   const [profile, setProfile]     = useState<Profile | null>(null);
   const [loading, setLoading]     = useState(true);
@@ -45,7 +78,7 @@ export default function ProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPass, setIsChangingPass] = useState(false);
 
-  const [fullName, setFullName] = useState('');
+  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '');
   const [bio, setBio]           = useState('');
   const [phone, setPhone]       = useState('');
 
@@ -54,21 +87,52 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loadingPass, setLoadingPass]         = useState(false);
 
+  const skeletonOpacity = useSharedValue(0.3);
+
   useEffect(() => {
     if (!isLoggedIn) router.replace('/login');
   }, [isLoggedIn]);
 
-  const fetchProfile = async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (data) {
-      setProfile(data as Profile);
-      setFullName(data.full_name ?? '');
-      setBio(data.bio ?? '');
-      setPhone(data.phone ?? '');
+  useEffect(() => {
+    if (loading) {
+      skeletonOpacity.value = withRepeat(
+        withTiming(0.8, { duration: 800 }),
+        -1,
+        true
+      );
+    } else {
+      skeletonOpacity.value = 1;
     }
-    setLoading(false);
+  }, [loading]);
+
+  const skeletonAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: skeletonOpacity.value,
+    };
+  });
+
+  const fetchProfile = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (error && error.code !== 'PGRST116') { // PGRST116 is code for no rows returned, which is fine for new users
+        console.warn("Error fetching profile details:", error.message);
+      }
+      if (data) {
+        setProfile(data as Profile);
+        setFullName(data.full_name ?? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || ''));
+        setBio(data.bio ?? '');
+        setPhone(data.phone ?? '');
+      }
+    } catch (e: any) {
+      console.warn("Exception during profile fetch:", e.message || e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchProfile(); }, [user]);
@@ -181,17 +245,45 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#0f172a" />
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? colors.background : '#0f172a' }]}>
+        <ActivityIndicator size="large" color="#ffffff" />
+        <Text style={{ marginTop: 16, color: '#94a3b8', fontSize: 14, fontWeight: '600', letterSpacing: 0.3 }}>
+          Memuat Profil...
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }} bounces={false}>
+    <Animated.View entering={FadeIn.duration(400)} style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={styles.container}>
+
+      {/* STICKY HEADER WITH DYNAMIC BACKGROUND */}
+      <SafeAreaView edges={['top']} style={styles.absoluteHeader}>
+        <Animated.View 
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: isDark ? colors.backgroundSecondary : '#0f172a' },
+            headerAnimatedStyle
+          ]}
+        />
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+            <Feather name="arrow-left" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitleBar}>Profil Akun</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </SafeAreaView>
+
+      <Animated.ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingBottom: 20 }} 
+        bounces={false} 
+        style={{ flex: 1 }}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+      >
         {/* Curved Header Background with Faded Image */}
         <View style={styles.headerBackground}>
           <Image 
@@ -208,56 +300,88 @@ export default function ProfileScreen() {
           />
         </View>
 
-        <SafeAreaView edges={['top']} style={styles.safeArea}>
-          <View style={styles.headerBar}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-              <Feather name="arrow-left" size={24} color="#ffffff" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitleBar}>Profil Akun</Text>
-            <View style={{ width: 40 }} />
-          </View>
+        {/* Spacer to push content below the transparent header */}
+        <SafeAreaView edges={['top']}>
+          <View style={{ height: 60 }} />
+        </SafeAreaView>
 
-          <View style={styles.scrollContent}>
+        <View style={styles.scrollContent}>
           
           {/* Avatar & Profile Info Section */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatarContainer}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatarInisial}>
-                  <Text style={styles.avatarLetter}>{(fullName || user?.email || 'U').charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
-              {uploading && (
-                <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator color="#ffffff" size="small" />
-                </View>
-              )}
-              <TouchableOpacity onPress={() => pickImage('gallery')} style={styles.editAvatarBtn} disabled={uploading} activeOpacity={0.8}>
-                <Feather name="camera" size={14} color="#ffffff" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.profileNameTxt}>{fullName || 'Pengguna Anonim'}</Text>
-            { isAdmin && (
-              <View style={styles.adminBadge}>
-                <MaterialCommunityIcons name="shield-star" size={14} color="#0f172a" />
-                <Text style={styles.adminBadgeTxt}>Admin Terverifikasi</Text>
+            {loading ? (
+              <View style={styles.avatarContainer}>
+                <Animated.View style={[styles.skeleton, { width: 100, height: 100, borderRadius: 50 }, skeletonAnimatedStyle]} />
+              </View>
+            ) : (
+              <View style={styles.avatarContainer}>
+                {profile?.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatarInisial}>
+                    <Text style={styles.avatarLetter}>{(fullName || user?.email || 'U').charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+                {uploading && (
+                  <View style={styles.uploadingOverlay}>
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  </View>
+                )}
+                <TouchableOpacity onPress={() => pickImage('gallery')} style={styles.editAvatarBtn} disabled={uploading} activeOpacity={0.8}>
+                  <Feather name="camera" size={14} color="#ffffff" />
+                </TouchableOpacity>
               </View>
             )}
-            <Text style={styles.profileEmailTxt}>{user?.email}</Text>
-            {phone ? <Text style={styles.profilePhoneTxt}>{phone}</Text> : null}
-            {bio ? <Text style={styles.bioText}>"{bio}"</Text> : null}
+
+            {loading ? (
+              <View style={{ alignItems: 'center', marginTop: 16, width: '100%' }}>
+                <Animated.View style={[styles.skeleton, { width: 160, height: 22, marginBottom: 8 }, skeletonAnimatedStyle]} />
+                <Animated.View style={[styles.skeleton, { width: 180, height: 14, marginBottom: 8 }, skeletonAnimatedStyle]} />
+                <Animated.View style={[styles.skeleton, { width: 120, height: 14, marginBottom: 8 }, skeletonAnimatedStyle]} />
+                <Animated.View style={[styles.skeleton, { width: '80%', height: 16 }, skeletonAnimatedStyle]} />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.profileNameTxt}>{fullName || 'Pengguna Anonim'}</Text>
+                { isAdmin && (
+                  <View style={styles.adminBadge}>
+                    <MaterialCommunityIcons name="shield-star" size={14} color="#0f172a" />
+                    <Text style={styles.adminBadgeTxt}>Admin Terverifikasi</Text>
+                  </View>
+                )}
+                <Text style={styles.profileEmailTxt}>{user?.email}</Text>
+                {phone ? <Text style={styles.profilePhoneTxt}>{phone}</Text> : null}
+                {bio ? <Text style={styles.bioText}>"{bio}"</Text> : null}
+              </>
+            )}
             
             <View style={styles.actionRowBtn}>
-              <TouchableOpacity style={styles.primaryBtn} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.primaryBtn} onPress={() => setIsEditing(true)} activeOpacity={0.8} disabled={loading}>
                 <Feather name="edit-3" size={14} color="#ffffff" />
                 <Text style={styles.primaryBtnTxt}>Ubah Profil</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryBtn} onPress={() => setIsChangingPass(true)} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => setIsChangingPass(true)} activeOpacity={0.8} disabled={loading}>
                 <Feather name="lock" size={14} color="#0f172a" />
                 <Text style={styles.secondaryBtnTxt}>Ubah Sandi</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Theme Switcher */}
+          <View style={styles.sectionGroup}>
+            <Text style={styles.sectionHeaderTxt}>Tampilan Tema</Text>
+            <View style={styles.themeSelectorRow}>
+              <TouchableOpacity onPress={() => setMode('light')} style={[styles.themeBtn, mode === 'light' && styles.themeBtnActive]}>
+                <Feather name="sun" size={16} color={mode === 'light' ? colors.background : colors.textSecondary} />
+                <Text style={[styles.themeBtnTxt, mode === 'light' && styles.themeBtnTxtActive]}>Terang</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setMode('dark')} style={[styles.themeBtn, mode === 'dark' && styles.themeBtnActive]}>
+                <Feather name="moon" size={16} color={mode === 'dark' ? colors.background : colors.textSecondary} />
+                <Text style={[styles.themeBtnTxt, mode === 'dark' && styles.themeBtnTxtActive]}>Gelap</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setMode('system')} style={[styles.themeBtn, mode === 'system' && styles.themeBtnActive]}>
+                <Feather name="smartphone" size={16} color={mode === 'system' ? colors.background : colors.textSecondary} />
+                <Text style={[styles.themeBtnTxt, mode === 'system' && styles.themeBtnTxtActive]}>Sistem</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -302,11 +426,26 @@ export default function ProfileScreen() {
           <View style={styles.sectionGroup}>
             <Text style={styles.sectionHeaderTxt}>Lainnya</Text>
             <View style={styles.menuCard}>
-              <MenuRow icon="help-circle" title="Pusat Layanan" sub="Tanya jawab & bantuan pengguna" />
+              <MenuRow 
+                icon="help-circle" 
+                title="Pusat Layanan" 
+                sub="Tanya jawab & bantuan pengguna" 
+                onPress={() => router.push('/help-center')}
+              />
               <View style={styles.divider} />
-              <MenuRow icon="file-text" title="Syarat Ketentuan" sub="Regulasi dan kebijakan data" />
+              <MenuRow 
+                icon="file-text" 
+                title="Syarat Ketentuan" 
+                sub="Regulasi dan kebijakan data" 
+                onPress={() => router.push('/terms')}
+              />
               <View style={styles.divider} />
-              <MenuRow icon="info" title="Informasi Aplikasi" sub="Versi 1.0.0 (Release)" />
+              <MenuRow 
+                icon="info" 
+                title="Informasi Aplikasi" 
+                sub="Versi 1.0.0 (Release)" 
+                onPress={() => router.push('/app-info')}
+              />
             </View>
           </View>
 
@@ -323,8 +462,7 @@ export default function ProfileScreen() {
           </View>
 
           </View>
-        </SafeAreaView>
-      </ScrollView>
+        </Animated.ScrollView>
 
       {/* Moda: Edit Profil */}
       {isEditing && (
@@ -393,26 +531,28 @@ export default function ProfileScreen() {
       )}
 
     </View>
+    </Animated.View>
   );
 }
 
 function MenuRow({ icon, title, sub, onPress }: any) {
+  const { colors } = useTheme();
   return (
-    <TouchableOpacity onPress={onPress} style={styles.menuRow} activeOpacity={0.7}>
-      <View style={styles.menuIconWrap}>
-        <Feather name={icon} size={18} color="#0f172a" />
+    <TouchableOpacity onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} activeOpacity={0.7}>
+      <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+        <Feather name={icon} size={18} color={colors.text} />
       </View>
-      <View style={styles.menuTextContent}>
-        <Text style={styles.menuTitle}>{title}</Text>
-        {sub && <Text style={styles.menuSub}>{sub}</Text>}
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', marginBottom: 2 }}>{title}</Text>
+        {sub && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{sub}</Text>}
       </View>
-      <Feather name="chevron-right" size={18} color="#94a3b8" />
+      <Feather name="chevron-right" size={18} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fcfdfe' },
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   headerBackground: { 
     position: 'absolute', 
     left: -(width * 2.5 - width) / 2, 
@@ -420,10 +560,12 @@ const styles = StyleSheet.create({
     width: width * 2.5, 
     height: width * 2.5, 
     borderRadius: (width * 2.5) / 2, 
-    backgroundColor: '#0f172a', 
+    backgroundColor: isDark ? colors.backgroundSecondary : '#0f172a', 
     overflow: 'hidden' 
   },
   safeArea: { flex: 1 },
+  absoluteHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 999 },
+  backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,10 +573,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitleBar: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   scrollContent: { paddingHorizontal: 20, paddingTop: height * 0.05 },
-  
+  skeleton: {
+    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+    borderRadius: 8,
+  },
   avatarSection: {
     alignItems: 'center',
     marginBottom: 32,
@@ -442,73 +586,74 @@ const styles = StyleSheet.create({
   avatarContainer: {
     width: 90, height: 90,
     borderRadius: 45,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     justifyContent: 'center', alignItems: 'center',
     marginBottom: 16,
     position: 'relative'
   },
   avatarImage: { width: '100%', height: '100%', borderRadius: 45 },
-  avatarInisial: { width: '100%', height: '100%', borderRadius: 45, backgroundColor: '#f1f5f9', justifyContent: 'center', alignItems: 'center' },
-  avatarLetter: { color: '#0f172a', fontSize: 32, fontWeight: '800' },
+  avatarInisial: { width: '100%', height: '100%', borderRadius: 45, backgroundColor: colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center' },
+  avatarLetter: { color: colors.text, fontSize: 32, fontWeight: '800' },
   uploadingOverlay: { position: 'absolute', width: '100%', height: '100%', borderRadius: 45, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   editAvatarBtn: {
     position: 'absolute',
     bottom: -2, right: -2,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     width: 30, height: 30,
     borderRadius: 15,
     justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#ffffff',
+    borderWidth: 2, borderColor: colors.background,
   },
   
-  profileNameTxt: { color: '#0f172a', fontSize: 20, fontWeight: '800', marginBottom: 4 },
-  adminBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 8, gap: 4 },
-  adminBadgeTxt: { color: '#0f172a', fontSize: 11, fontWeight: '600' },
-  profileEmailTxt: { color: '#64748b', fontSize: 13, fontWeight: '500', marginBottom: 2 },
-  profilePhoneTxt: { color: '#64748b', fontSize: 13, fontWeight: '500', marginBottom: 8 },
-  bioText: { color: '#0f172a', fontSize: 14, marginTop: 4, paddingHorizontal: 20, textAlign: 'center' },
+  profileNameTxt: { color: colors.text, fontSize: 20, fontWeight: '800', marginBottom: 4 },
+  adminBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundSecondary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 8, gap: 4 },
+  adminBadgeTxt: { color: colors.text, fontSize: 11, fontWeight: '600' },
+  profileEmailTxt: { color: colors.textSecondary, fontSize: 13, fontWeight: '500', marginBottom: 2 },
+  profilePhoneTxt: { color: colors.textSecondary, fontSize: 13, fontWeight: '500', marginBottom: 8 },
+  bioText: { color: colors.text, fontSize: 14, marginTop: 4, paddingHorizontal: 20, textAlign: 'center' },
   
   actionRowBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 20 },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f172a', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 24, gap: 6 },
-  primaryBtnTxt: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
-  secondaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 24, gap: 6 },
-  secondaryBtnTxt: { color: '#0f172a', fontWeight: '700', fontSize: 13 },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.text, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 24, gap: 6 },
+  primaryBtnTxt: { color: colors.background, fontWeight: '700', fontSize: 13 },
+  secondaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundSecondary, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 24, gap: 6 },
+  secondaryBtnTxt: { color: colors.text, fontWeight: '700', fontSize: 13 },
   
   sectionGroup: { marginBottom: 24 },
-  sectionHeaderTxt: { color: '#64748b', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12, marginLeft: 8 },
+  sectionHeaderTxt: { color: colors.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12, marginLeft: 8 },
   
-  card: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#f1f5f9' },
+  themeSelectorRow: { flexDirection: 'row', backgroundColor: colors.backgroundSecondary, borderRadius: 16, padding: 4 },
+  themeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 12, gap: 6 },
+  themeBtnActive: { backgroundColor: colors.text, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  themeBtnTxt: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  themeBtnTxtActive: { color: colors.background },
+
+  card: { backgroundColor: colors.card, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.border },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  cardIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  cardIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.backgroundSecondary, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   cardHeaderText: { flex: 1 },
-  cardTitle: { color: '#0f172a', fontSize: 14, fontWeight: '700', marginBottom: 2 },
-  cardSub: { color: '#64748b', fontSize: 11, fontWeight: '500' },
-  percentTxt: { color: '#0f172a', fontSize: 13, fontWeight: '700' },
-  progressBarWrapper: { height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#0f172a', borderRadius: 3 },
+  cardTitle: { color: colors.text, fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  cardSub: { color: colors.textSecondary, fontSize: 11, fontWeight: '500' },
+  percentTxt: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  progressBarWrapper: { height: 6, backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: colors.text, borderRadius: 3 },
   
-  menuCard: { backgroundColor: '#ffffff', borderRadius: 20, borderWidth: 1, borderColor: '#f1f5f9', overflow: 'hidden' },
-  menuRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
-  menuIconWrap: { width: 32, height: 32, borderRadius: 10, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  menuTextContent: { flex: 1 },
-  menuTitle: { color: '#0f172a', fontSize: 14, fontWeight: '600', marginBottom: 2 },
-  menuSub: { color: '#94a3b8', fontSize: 11 },
-  divider: { height: 1, backgroundColor: '#f1f5f9', marginLeft: 62 },
+  menuCard: { backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  divider: { height: 1, backgroundColor: colors.border, marginLeft: 62 },
   
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fef2f2', paddingVertical: 14, borderRadius: 16, gap: 8 },
-  logoutTxt: { color: '#ef4444', fontWeight: '700', fontSize: 14 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2', paddingVertical: 14, borderRadius: 16, gap: 8 },
+  logoutTxt: { color: colors.danger, fontWeight: '700', fontSize: 14 },
 
   // Modals
-  overlayModal: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2, 6, 23, 0.5)', zIndex: 100 },
+  overlayModal: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 100 },
   bottomSheetWrapper: { flex: 1, justifyContent: 'flex-end' },
   sheetCloseBg: { ...StyleSheet.absoluteFillObject },
-  bottomSheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
-  dragIndicator: { width: 40, height: 4, backgroundColor: '#e2e8f0', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  bottomSheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  dragIndicator: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  sheetTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800' },
+  sheetTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   inputBox: { marginBottom: 16 },
-  inputLabel: { color: '#475569', fontSize: 12, fontWeight: '700', marginBottom: 8 },
-  input: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 16, color: '#0f172a', fontSize: 14, borderWidth: 1, borderColor: '#f1f5f9' },
-  saveBtn: { backgroundColor: '#0f172a', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
-  saveBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
+  inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '700', marginBottom: 8 },
+  input: { backgroundColor: colors.backgroundSecondary, borderRadius: 12, padding: 16, color: colors.text, fontSize: 14, borderWidth: 1, borderColor: colors.border },
+  saveBtn: { backgroundColor: colors.text, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 12 },
+  saveBtnText: { color: colors.background, fontWeight: '800', fontSize: 14 },
 });

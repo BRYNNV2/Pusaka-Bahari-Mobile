@@ -1,16 +1,19 @@
 {
   "expo": {
-    "name": "Mobileproject",
-    "slug": "Mobileproject",
+    "name": "RAHVerse",
+    "slug": "RAHVerse",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobileproject",
+    "backgroundColor": "#0f172a",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "backgroundColor": "#0f172a",
       "supportsTablet": true
     },
     "android": {
+      "backgroundColor": "#0f172a",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

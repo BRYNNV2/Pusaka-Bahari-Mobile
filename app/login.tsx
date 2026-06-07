@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import * as Linking from 'expo-linking';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -26,6 +27,8 @@ const { width } = Dimensions.get('window');
 type Tab = 'login' | 'register';
 
 export default function LoginScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { login, register } = useAuth();
 
@@ -155,7 +158,7 @@ export default function LoginScreen() {
             <View style={styles.imageOverlay} />
             <View style={styles.imageTitle}>
               <Feather name="anchor" size={20} color="#ffffff" />
-              <Text style={styles.imageTitleText}>Pusaka Bahari</Text>
+              <Text style={styles.imageTitleText}>RAHVerse</Text>
             </View>
           </Animated.View>
 
@@ -202,11 +205,11 @@ export default function LoginScreen() {
 
               {activeTab === 'register' && (
                 <View style={styles.inputContainer}>
-                  <Feather name="user" size={20} color="#94a3b8" style={styles.inputIcon} />
+                  <Feather name="user" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Nama Lengkap"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.textSecondary}
                     value={fullName}
                     onChangeText={setFullName}
                     autoCapitalize="words"
@@ -215,11 +218,11 @@ export default function LoginScreen() {
               )}
 
               <View style={styles.inputContainer}>
-                <Feather name="mail" size={20} color="#94a3b8" style={styles.inputIcon} />
+                <Feather name="mail" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Alamat Surel (Email)"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={email}
@@ -228,27 +231,27 @@ export default function LoginScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Feather name="lock" size={20} color="#94a3b8" style={styles.inputIcon} />
+                <Feather name="lock" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Kata Sandi"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.textSecondary}
                   secureTextEntry={!showPass}
                   value={password}
                   onChangeText={setPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPass(!showPass)}>
-                  <Feather name={showPass ? 'eye-off' : 'eye'} size={20} color="#94a3b8" />
+                  <Feather name={showPass ? 'eye-off' : 'eye'} size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               {activeTab === 'register' && (
                 <View style={styles.inputContainer}>
-                  <Feather name="lock" size={20} color="#94a3b8" style={styles.inputIcon} />
+                  <Feather name="lock" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Konfirmasi Kata Sandi"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.textSecondary}
                     secureTextEntry={!showPass}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
@@ -272,7 +275,7 @@ export default function LoginScreen() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#ffffff" />
+                  <ActivityIndicator color={colors.background} />
                 ) : (
                   <Text style={styles.primaryBtnText}>
                     {activeTab === 'login' ? 'Masuk Akun' : 'Daftar Sekarang'}
@@ -301,10 +304,10 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
   },
   keyboardView: {
     flex: 1,
@@ -351,7 +354,7 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     borderRadius: 12,
     padding: 4,
     marginBottom: 28,
@@ -364,7 +367,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
@@ -374,30 +377,30 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: colors.textSecondary,
   },
   tabTextActive: {
-    color: '#0f172a',
+    color: colors.text,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
     letterSpacing: -0.8,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 20,
     marginBottom: 20,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fef2f2',
+    backgroundColor: isDark ? "rgba(220, 38, 38, 0.1)" : "#fef2f2",
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: isDark ? "rgba(220, 38, 38, 0.3)" : "#fecaca",
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
@@ -406,7 +409,7 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     fontSize: 13,
-    color: '#dc2626',
+    color: colors.danger,
     fontWeight: '500',
   },
   inputGroup: {
@@ -415,9 +418,9 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     borderRadius: 12,
     height: 54,
     paddingHorizontal: 16,
@@ -430,35 +433,35 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     fontSize: 15,
-    color: '#0f172a',
+    color: colors.text,
   },
   forgotBtn: {
     alignSelf: 'flex-end',
     paddingVertical: 4,
   },
   forgotText: {
-    color: '#0f172a',
+    color: colors.text,
     fontWeight: '600',
     fontSize: 13,
   },
   primaryBtn: {
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     height: 54,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0f172a',
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 6,
   },
   primaryBtnDisabled: {
-    backgroundColor: '#475569',
+    backgroundColor: colors.textSecondary,
     elevation: 0,
   },
   primaryBtnText: {
-    color: 'white',
+    color: colors.card,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -470,10 +473,10 @@ const styles = StyleSheet.create({
   line: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: colors.border,
   },
   dividerText: {
-    color: '#94a3b8',
+    color: colors.textSecondary,
     paddingHorizontal: 16,
     fontSize: 12,
     fontWeight: '600',
@@ -483,13 +486,13 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: 'white',
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   guestBtnText: {
-    color: '#475569',
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
   },

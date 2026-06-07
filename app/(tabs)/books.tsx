@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import {
+import { TextInput, 
   View,
   Text,
   StyleSheet,
@@ -18,6 +18,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
@@ -38,6 +39,8 @@ type BookItem = {
 const PAGE_SIZE = 10;
 
 export default function BooksScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const [books, setBooks] = useState<BookItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,7 @@ export default function BooksScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [totalBooks, setTotalBooks] = useState(0);
 
   const fetchBooks = useCallback(async (refresh = false, pageNum = 0) => {
@@ -126,7 +130,7 @@ export default function BooksScreen() {
           style={styles.coverGradient}
         />
         <View style={styles.fileTypeBadge}>
-          <Feather name="file-text" size={10} color="#fff" />
+          <Feather name="file-text" size={10} color="#ffffff" />
           <Text style={styles.fileTypeBadgeText}>{(item.file_type || 'pdf').toUpperCase()}</Text>
         </View>
       </View>
@@ -140,45 +144,72 @@ export default function BooksScreen() {
   );
 
   return (
+    
+    
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.card} />
 
-      <SafeAreaView edges={['top']} style={styles.headerArea}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Perpustakaan Digital</Text>
-        </View>
-      </SafeAreaView>
+      <SafeAreaView edges={['top']} style={{ flex: 0, backgroundColor: colors.card }} />
 
-      {/* Hero Section */}
+      {/* New Rich Hero Section */}
       <View style={styles.heroSection}>
-        <View style={styles.heroIconWrap}>
-          <Ionicons name="library" size={28} color="#8B5E3C" />
+        <Image 
+          source={require('../../assets/images/naskah_gurindam_1776493215711.jpg')}
+          style={StyleSheet.absoluteFillObject}
+        />
+        <LinearGradient 
+          colors={isDark ? ['rgba(15, 23, 42, 0.85)', 'rgba(15, 23, 42, 0.95)'] : ['rgba(139, 94, 60, 0.85)', 'rgba(60, 36, 21, 0.95)']} 
+          style={StyleSheet.absoluteFillObject} 
+        />
+        
+        <View style={styles.heroContent}>
+          <Text style={styles.heroTitle}>Pustaka Nusantara</Text>
+          <Text style={styles.heroSub}>
+            Eksplorasi arsip naskah kuno dan literatur warisan sejarah maritim Kepulauan Riau.
+          </Text>
+
+          {/* Stats Row */}
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStatItem}>
+              <Text style={styles.heroStatNum}>{totalBooks}</Text>
+              <Text style={styles.heroStatLabel}>Koleksi</Text>
+            </View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStatItem}>
+              <Text style={styles.heroStatNum}>{books.filter(b => b.file_url).length}</Text>
+              <Text style={styles.heroStatLabel}>Tersedia</Text>
+            </View>
+          </View>
         </View>
-        <Text style={styles.heroTitle}>Koleksi Naskah & Buku</Text>
-        <Text style={styles.heroSub}>
-          Baca dan unduh naskah kuno, buku sejarah, dan literatur warisan budaya Melayu.
-        </Text>
-        <View style={styles.heroStats}>
-          <View style={styles.heroStatItem}>
-            <Text style={styles.heroStatNum}>{totalBooks}</Text>
-            <Text style={styles.heroStatLabel}>Total Buku</Text>
-          </View>
-          <View style={styles.heroStatDivider} />
-          <View style={styles.heroStatItem}>
-            <Text style={styles.heroStatNum}>{books.filter(b => b.file_url).length}</Text>
-            <Text style={styles.heroStatLabel}>Tersedia</Text>
-          </View>
+      </View>
+
+      {/* Floating Search Bar */}
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchBar}>
+          <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cari judul buku atau naskah..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Feather name="x" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       {loading ? (
         <View style={styles.centerWrap}>
-          <ActivityIndicator size="large" color="#0f172a" />
+          <ActivityIndicator size="large" color={colors.text} />
           <Text style={styles.loadingText}>Memuat perpustakaan...</Text>
         </View>
       ) : (
         <FlatList
-          data={books}
+          data={books.filter(b => b.title.toLowerCase().includes(searchQuery.toLowerCase()) || (b.author && b.author.toLowerCase().includes(searchQuery.toLowerCase())))}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderBookCard}
           numColumns={2}
@@ -193,8 +224,8 @@ export default function BooksScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#64748b" />
-                <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>Memuat lebih banyak...</Text>
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>Memuat lebih banyak...</Text>
               </View>
             ) : null
           }
@@ -229,11 +260,11 @@ export default function BooksScreen() {
                 <Text style={styles.modalAuthor}>{selectedBook.author || 'Penulis tidak diketahui'}</Text>
                 <View style={styles.modalBadgeRow}>
                   <View style={styles.modalBadge}>
-                    <Feather name="file-text" size={12} color="#8B5E3C" />
+                    <Feather name="file-text" size={12} color={colors.primary} />
                     <Text style={styles.modalBadgeText}>{(selectedBook.file_type || 'pdf').toUpperCase()}</Text>
                   </View>
                   <View style={styles.modalBadge}>
-                    <Feather name="calendar" size={12} color="#8B5E3C" />
+                    <Feather name="calendar" size={12} color={colors.primary} />
                     <Text style={styles.modalBadgeText}>
                       {new Date(selectedBook.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </Text>
@@ -255,7 +286,7 @@ export default function BooksScreen() {
                 onPress={() => openBook(selectedBook)}
                 disabled={!selectedBook.file_url}
               >
-                <Feather name="eye" size={18} color="#fff" />
+                <Feather name="eye" size={18} color={colors.background} />
                 <Text style={styles.modalBtnText}>Baca / Buka</Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -272,15 +303,15 @@ export default function BooksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
   },
   headerArea: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
   },
   header: {
     flexDirection: 'row',
@@ -293,54 +324,53 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
   },
+  
   heroSection: {
+    width: '100%',
     paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 20,
-    alignItems: 'center',
+    paddingTop: 40,
+    paddingBottom: 48,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  heroIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: '#fdf2e9',
+  heroContent: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
+    position: 'relative',
+    zIndex: 2,
   },
   heroTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#ffffff',
     letterSpacing: -0.5,
-    marginBottom: 8,
+    marginBottom: 10,
     textAlign: 'center',
   },
   heroSub: {
-    fontSize: 13,
-    color: '#64748b',
-    lineHeight: 20,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 22,
     textAlign: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 18,
+    paddingHorizontal: 10,
+    marginBottom: 24,
   },
-  heroStats: {
+  heroStatsRow: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 32,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: 'rgba(255,255,255,0.1)',
     gap: 24,
     alignItems: 'center',
   },
@@ -348,32 +378,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroStatNum: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#ffffff',
   },
   heroStatLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
   },
   heroStatDivider: {
     width: 1,
-    height: 30,
-    backgroundColor: '#e2e8f0',
+    height: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  centerWrap: {
-    flex: 1,
+  searchWrapper: {
+    paddingHorizontal: 24,
+    marginTop: -26,
+    marginBottom: 20,
+    zIndex: 10,
+  },
+  searchBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 100,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    height: 54,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border,
   },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 15,
+    color: colors.text,
+  },
+
   loadingText: {
     marginTop: 12,
     fontSize: 14,
     fontWeight: '500',
-    color: '#94a3b8',
+    color: colors.textSecondary,
   },
   listContent: {
     paddingHorizontal: 20,
@@ -385,11 +440,11 @@ const styles = StyleSheet.create({
   },
   bookCard: {
     width: CARD_WIDTH,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
@@ -435,13 +490,13 @@ const styles = StyleSheet.create({
   bookTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
     lineHeight: 18,
   },
   bookAuthor: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   // Modal
@@ -455,7 +510,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 24,
     padding: 20,
     maxHeight: '80%',
@@ -469,7 +524,7 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 12,
     marginRight: 16,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
   },
   modalInfo: {
     flex: 1,
@@ -478,13 +533,13 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 6,
     lineHeight: 22,
   },
   modalAuthor: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     fontWeight: '500',
     marginBottom: 12,
   },
@@ -497,7 +552,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#fdf2e9',
+    backgroundColor: colors.backgroundSecondary,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
@@ -505,25 +560,25 @@ const styles = StyleSheet.create({
   modalBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8B5E3C',
+    color: colors.primary,
   },
   modalDescSection: {
     marginBottom: 18,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     padding: 14,
     borderRadius: 14,
   },
   modalDescLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   modalDescText: {
     fontSize: 13,
-    color: '#475569',
+    color: colors.textSecondary,
     lineHeight: 20,
   },
   modalActions: {
@@ -536,12 +591,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     paddingVertical: 14,
     borderRadius: 14,
   },
   modalBtnText: {
-    color: '#ffffff',
+    color: colors.card,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -550,12 +605,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalBtnOutlineText: {
-    color: '#64748b',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -568,7 +623,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -576,13 +631,19 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 6,
   },
   emptyDesc: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  centerWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
   },
 });

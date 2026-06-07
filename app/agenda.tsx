@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Calendar from 'expo-calendar';
 import { Alert, Platform } from 'react-native';
@@ -29,6 +30,8 @@ type AgendaItem = {
 };
 
 export default function AgendaScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const [data, setData] = useState<AgendaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,12 +173,12 @@ export default function AgendaScreen() {
           <View style={styles.cardFooter}>
             <View style={{ flex: 1 }}>
               <View style={styles.cardTimeRow}>
-                <Feather name="clock" size={14} color="#64748b" />
+                <Feather name="clock" size={14} color={colors.textSecondary} />
                 <Text style={styles.cardFooterText}>{formatDate(item.event_date)}</Text>
               </View>
               <View style={[styles.cardTimeRow, { marginTop: 4 }]}>
                 <Ionicons name="timer-outline" size={14} color={isPast ? "#ef4444" : "#c8956c"} />
-                <Text style={[styles.cardFooterText, { color: isPast ? '#ef4444' : '#c8956c', fontWeight: 'bold' }]}>
+                <Text style={[styles.cardFooterText, { color: isPast ? colors.danger : colors.primary, fontWeight: 'bold' }]}>
                   {timeLeft}
                 </Text>
               </View>
@@ -183,7 +186,7 @@ export default function AgendaScreen() {
 
             {!isPast && (
               <TouchableOpacity style={styles.actBtn} onPress={addToCalendar}>
-                <Feather name="calendar" size={14} color="#fff" />
+                <Feather name="calendar" size={14} color={colors.background} />
                 <Text style={styles.actBtnText}>Ingatkan</Text>
               </TouchableOpacity>
             )}
@@ -200,7 +203,7 @@ export default function AgendaScreen() {
       <SafeAreaView edges={['top']} style={styles.headerArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="arrow-left" size={24} color="#0f172a" />
+            <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Agenda & Acara</Text>
           <View style={{ width: 40 }} />
@@ -210,13 +213,13 @@ export default function AgendaScreen() {
       <View style={styles.heroSection}>
         <Text style={styles.heroTitle}>Jadwal Kebudayaan</Text>
         <Text style={styles.heroSub}>
-          Ikuti terus perkembangan festival, kajian, dan peringatan sejarah di Pusaka Bahari.
+          Ikuti terus perkembangan festival, kajian, dan peringatan sejarah di RAHVerse.
         </Text>
       </View>
 
       {loading ? (
         <View style={styles.centerWrap}>
-          <ActivityIndicator size="large" color="#0f172a" />
+          <ActivityIndicator size="large" color={colors.text} />
           <Text style={styles.loadingText}>Memuat jadwal agenda...</Text>
         </View>
       ) : (
@@ -241,15 +244,15 @@ export default function AgendaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
   },
   headerArea: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
   },
   header: {
     flexDirection: 'row',
@@ -262,14 +265,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
   },
   heroSection: {
     paddingHorizontal: 24,
@@ -279,13 +282,13 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
     letterSpacing: -0.5,
     marginBottom: 8,
   },
   heroSub: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 22,
   },
   centerWrap: {
@@ -298,7 +301,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     fontWeight: '500',
-    color: '#94a3b8',
+    color: colors.textSecondary,
   },
   listContent: {
     paddingHorizontal: 20,
@@ -306,12 +309,12 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -322,9 +325,9 @@ const styles = StyleSheet.create({
     width: 64,
     height: 72,
     borderRadius: 16,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -332,12 +335,12 @@ const styles = StyleSheet.create({
   cardDateDay: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
   },
   cardDateMonth: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#8B5E3C',
+    color: colors.primary,
     marginTop: 2,
   },
   cardContent: {
@@ -346,12 +349,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 6,
   },
   cardDesc: {
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 16,
   },
@@ -360,7 +363,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: colors.border,
     paddingTop: 12,
   },
   cardTimeRow: {
@@ -372,10 +375,10 @@ const styles = StyleSheet.create({
   cardFooterText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#64748b',
+    color: colors.textSecondary,
   },
   actBtn: {
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -384,7 +387,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actBtnText: {
-    color: '#ffffff',
+    color: colors.card,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -397,7 +400,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -405,12 +408,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 6,
   },
   emptyDesc: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 40,
   },

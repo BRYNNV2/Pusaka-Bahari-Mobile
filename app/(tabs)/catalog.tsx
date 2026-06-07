@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
+import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -75,6 +76,8 @@ const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_177649321571
 const PAGE_SIZE = 20;
 
 export default function CatalogScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
   const [database, setDatabase] = useState<ArtifactItem[]>([]);
@@ -143,7 +146,7 @@ export default function CatalogScreen() {
     return matchesSearch && item.type === TYPE_MAP[activeCategory];
   });
 
-  const getTypeStyle = (type: string) => TYPE_COLORS[type] || { bg: '#f1f5f9', text: '#475569', icon: 'box' };
+  const getTypeStyle = (type: string) => TYPE_COLORS[type] || { bg: colors.border, text: colors.textSecondary, icon: 'box' };
 
   const renderItem = ({ item }: { item: ArtifactItem }) => {
     const typeStyle = getTypeStyle(item.type);
@@ -159,7 +162,7 @@ export default function CatalogScreen() {
             style={styles.cardImage} 
           />
           <View style={styles.imageOverlay} />
-          <View style={[styles.badge, { backgroundColor: typeStyle.bg }]}>
+          <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : typeStyle.bg }]}>
             <Feather name={typeStyle.icon} size={10} color={typeStyle.text} style={{ marginRight: 4 }} />
             <Text style={[styles.badgeText, { color: typeStyle.text }]}>{item.type}</Text>
           </View>
@@ -194,8 +197,8 @@ export default function CatalogScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" translucent={false} />
-      <SafeAreaView edges={['top']} style={{ flex: 0, backgroundColor: '#ffffff' }} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.card} translucent={false} />
+      <SafeAreaView edges={['top']} style={{ flex: 0, backgroundColor: colors.card }} />
       
       {/* Header */}
       <View style={styles.header}>
@@ -208,17 +211,17 @@ export default function CatalogScreen() {
       {/* Search Bar */}
       <View style={styles.searchWrapper}>
         <View style={styles.searchBar}>
-          <Feather name="search" size={20} color="#94a3b8" style={styles.searchIcon} />
+          <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Cari keris, perahu, monumen..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textSecondary}
             value={searchTerm}
             onChangeText={setSearchTerm}
           />
           {searchTerm.length > 0 && (
             <TouchableOpacity onPress={() => setSearchTerm('')}>
-              <Feather name="x" size={18} color="#94a3b8" />
+              <Feather name="x" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
@@ -252,7 +255,7 @@ export default function CatalogScreen() {
       <View style={styles.listContainer}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0f172a" />
+            <ActivityIndicator size="large" color={colors.text} />
             <Text style={styles.loadingText}>Menyusun Katalog...</Text>
           </View>
         ) : activeCategory === 'Kamus Istilah' ? (
@@ -288,8 +291,8 @@ export default function CatalogScreen() {
             ListFooterComponent={
               loadingMore ? (
                 <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color="#64748b" />
-                  <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 8 }}>Memuat lebih banyak...</Text>
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>Memuat lebih banyak...</Text>
                 </View>
               ) : null
             }
@@ -331,12 +334,12 @@ export default function CatalogScreen() {
               
               <View style={styles.metaRow}>
                 <View style={styles.metaBox}>
-                  <Feather name="calendar" size={16} color="#64748b" style={{ marginBottom: 4 }} />
+                  <Feather name="calendar" size={16} color={colors.textSecondary} style={{ marginBottom: 4 }} />
                   <Text style={styles.metaLabel}>Tahun / Era</Text>
                   <Text style={styles.metaValue}>{selectedItem.year}</Text>
                 </View>
                 <View style={styles.metaBox}>
-                  <Feather name="map-pin" size={16} color="#64748b" style={{ marginBottom: 4 }} />
+                  <Feather name="map-pin" size={16} color={colors.textSecondary} style={{ marginBottom: 4 }} />
                   <Text style={styles.metaLabel}>Lokasi Penyimpanan</Text>
                   <Text style={styles.metaValue} numberOfLines={2}>{selectedItem.location || 'Museum Bahari / Koleksi Pribadi'}</Text>
                 </View>
@@ -356,21 +359,21 @@ export default function CatalogScreen() {
       {selectedKamus && (
         <Modal visible={!!selectedKamus} animationType="fade" transparent={true} onRequestClose={() => setSelectedKamus(null)}>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-            <View style={{ width: '100%', backgroundColor: '#ffffff', borderRadius: 24, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
+            <View style={{ width: '100%', backgroundColor: colors.card, borderRadius: 24, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 }}>
               <View style={[styles.kamusIcon, { width: 64, height: 64, borderRadius: 32, marginBottom: 16 }]}>
                 <Text style={[styles.kamusLetter, { fontSize: 28 }]}>{selectedKamus.term.charAt(0)}</Text>
               </View>
-              <Text style={{ fontSize: 24, fontWeight: '800', color: '#0f172a', marginBottom: 12, textAlign: 'center' }}>
+              <Text style={{ fontSize: 24, fontWeight: '800', color: colors.text, marginBottom: 12, textAlign: 'center' }}>
                 {selectedKamus.term}
               </Text>
-              <Text style={{ fontSize: 15, color: '#475569', textAlign: 'center', lineHeight: 24, marginBottom: 32 }}>
+              <Text style={{ fontSize: 15, color: colors.textSecondary, textAlign: 'center', lineHeight: 24, marginBottom: 32 }}>
                 {selectedKamus.definition}
               </Text>
               <TouchableOpacity 
                 onPress={() => setSelectedKamus(null)} 
-                style={{ width: '100%', paddingVertical: 14, backgroundColor: '#0f172a', borderRadius: 14, alignItems: 'center' }}
+                style={{ width: '100%', paddingVertical: 14, backgroundColor: colors.text, borderRadius: 14, alignItems: 'center' }}
               >
-                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>Tutup</Text>
+                <Text style={{ color: colors.card, fontWeight: '700', fontSize: 16 }}>Tutup</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -381,38 +384,38 @@ export default function CatalogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
     letterSpacing: -1,
     marginBottom: 6,
   },
   headerDesc: {
     fontSize: 15,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 22,
   },
   searchWrapper: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     paddingHorizontal: 24,
     paddingBottom: 16,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 52,
@@ -424,30 +427,30 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     fontSize: 15,
-    color: '#0f172a',
+    color: colors.text,
   },
   categoriesWrapper: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
   },
   categoryPill: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
   },
   categoryPillActive: {
-    backgroundColor: '#3c2415',
+    backgroundColor: colors.text,
   },
   categoryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
+    color: colors.textSecondary,
   },
   categoryTextActive: {
-    color: '#ffffff',
+    color: colors.card,
   },
   listContainer: {
     flex: 1,
@@ -461,12 +464,12 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   card: {
     width: (width - 48 - 20) / 2, // 2 columns, padding 24 each side, 20 gap
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -510,7 +513,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
   year: {
@@ -521,7 +524,7 @@ const styles = StyleSheet.create({
   },
   desc: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   emptyContainer: {
@@ -531,7 +534,7 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   emptyText: {
-    color: '#94a3b8',
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -539,7 +542,7 @@ const styles = StyleSheet.create({
   // Detail Modal Styles
   detailContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
   },
   detailImageWrapper: {
     width: '100%',
@@ -566,7 +569,7 @@ const styles = StyleSheet.create({
   },
   detailContent: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     marginTop: -24,
@@ -575,7 +578,7 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 20,
     letterSpacing: -0.5,
   },
@@ -586,39 +589,39 @@ const styles = StyleSheet.create({
   },
   metaBox: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: colors.border,
   },
   metaLabel: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: colors.textSecondary,
     fontWeight: '600',
     marginBottom: 4,
   },
   metaValue: {
     fontSize: 14,
-    color: '#0f172a',
+    color: colors.text,
     fontWeight: '700',
   },
   detailSectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 12,
   },
   detailDescText: {
     fontSize: 16,
-    color: '#475569',
+    color: colors.textSecondary,
     lineHeight: 26,
   },
   
   // Kamus Styles
   kamusCard: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 16,
     shadowColor: '#000',
@@ -632,7 +635,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -648,12 +651,12 @@ const styles = StyleSheet.create({
   kamusTerm: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
   kamusDef: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 20,
   },
 });

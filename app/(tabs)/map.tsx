@@ -6,10 +6,13 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function MapScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const [activeSite, setActiveSite] = useState<any>(null);
   const [markers, setMarkers] = useState<any[]>([]);
@@ -50,13 +53,14 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <MapView
         style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation={true}
         mapType={Platform.OS == "android" ? "none" : "standard"}
+        userInterfaceStyle={isDark ? "dark" : "light"}
         showsCompass={false}
       >
         {Platform.OS === 'android' && (
@@ -70,7 +74,7 @@ export default function MapScreen() {
         {tourRoute.length >= 2 && (
           <Polyline
             coordinates={tourRoute}
-            strokeColor="#0f172a"
+            strokeColor={colors.primary}
             strokeWidth={4}
             lineDashPattern={[2, 4]}
           />
@@ -102,7 +106,7 @@ export default function MapScreen() {
             </Text>
           </View>
           <TouchableOpacity style={styles.refreshBtn} onPress={fetchLocations}>
-            <Feather name="refresh-cw" size={18} color="#0f172a" />
+            <Feather name="refresh-cw" size={18} color={colors.text} />
           </TouchableOpacity>
         </Animated.View>
       </SafeAreaView>
@@ -110,7 +114,7 @@ export default function MapScreen() {
       {/* Loading Overlay */}
       {loading && markers.length === 0 && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#0f172a" />
+          <ActivityIndicator size="large" color={colors.text} />
           <Text style={styles.loadingText}>Memuat situs warisan...</Text>
         </View>
       )}
@@ -133,7 +137,7 @@ export default function MapScreen() {
               </View>
             </View>
             <TouchableOpacity onPress={() => setActiveSite(null)} style={styles.closeBtn}>
-              <Feather name="x" size={20} color="#94a3b8" />
+              <Feather name="x" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           <Text style={styles.cardDesc} numberOfLines={3}>{activeSite.description}</Text>
@@ -147,7 +151,7 @@ export default function MapScreen() {
         </Animated.View>
       ) : !loading && (
         <Animated.View entering={FadeInUp.duration(600).delay(200)} style={styles.bottomInstructionCard}>
-          <Feather name="navigation" size={20} color="#0f172a" style={{ marginBottom: 12 }} />
+          <Feather name="navigation" size={20} color={colors.text} style={{ marginBottom: 12 }} />
           <Text style={styles.instructionTitle}>Mulai Eksplorasi</Text>
           <Text style={styles.instructionDesc}>
             {markers.length > 0
@@ -161,10 +165,10 @@ export default function MapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
   },
   map: {
     width: width,
@@ -179,7 +183,7 @@ const styles = StyleSheet.create({
   },
   headerCard: {
     flexDirection: 'row',
-    backgroundColor: 'white',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
@@ -195,18 +199,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
   headerDesc: {
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textSecondary,
   },
   refreshBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -216,14 +220,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: isDark ? "rgba(30, 41, 59, 0.8)" : "rgba(255,255,255,0.7)",
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
   },
   loadingText: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   customMarker: {
@@ -238,16 +242,16 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: colors.card,
   },
   bottomInstructionCard: {
     position: 'absolute',
     bottom: 100,
     width: width - 40,
     alignSelf: 'center',
-    backgroundColor: 'white',
+    backgroundColor: colors.card,
     padding: 24,
     borderRadius: 24,
     shadowColor: '#000',
@@ -260,12 +264,12 @@ const styles = StyleSheet.create({
   instructionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 8,
   },
   instructionDesc: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -274,7 +278,7 @@ const styles = StyleSheet.create({
     bottom: 100,
     width: width - 40,
     alignSelf: 'center',
-    backgroundColor: 'white',
+    backgroundColor: colors.card,
     padding: 24,
     borderRadius: 24,
     shadowColor: '#000',
@@ -293,7 +297,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: '800',
-    color: '#0f172a',
+    color: colors.text,
     marginRight: 16,
     lineHeight: 26,
   },
@@ -304,7 +308,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   typePill: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -312,11 +316,11 @@ const styles = StyleSheet.create({
   typePillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#475569',
+    color: colors.text,
   },
   yearText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   closeBtn: {
@@ -324,20 +328,20 @@ const styles = StyleSheet.create({
   },
   cardDesc: {
     fontSize: 15,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 22,
     marginBottom: 20,
   },
   actionBtn: {
     flexDirection: 'row',
-    backgroundColor: '#0f172a',
+    backgroundColor: colors.text,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionBtnText: {
-    color: 'white',
+    color: colors.card,
     fontSize: 15,
     fontWeight: '600',
   }

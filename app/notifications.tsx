@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type NotifItem = {
   id: number;
@@ -33,24 +35,54 @@ const NOTIF_ICONS: Record<string, { name: string; lib: 'feather' | 'ionicons' | 
 };
 
 export default function NotificationsScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { user } = useAuth();
   const [data, setData] = useState<NotifItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hiddenIds, setHiddenIds] = useState<number[]>([]);
 
   const fetchNotifications = async () => {
     setLoading(true);
+    const uid = user?.id || 'guest';
+    const hiddenStr = await AsyncStorage.getItem(`hiddenNotifs_${uid}`);
+    const hidden = hiddenStr ? JSON.parse(hiddenStr) : [];
+    setHiddenIds(hidden);
+
     const { data: rows } = await supabase
       .from('notifications')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
-    setData((rows as NotifItem[]) || []);
+      
+    const filtered = (rows as NotifItem[] || []).filter(n => !hidden.includes(n.id));
+    setData(filtered);
     setLoading(false);
 
-    // Simpan timestamp terakhir baca per akun
-    const uid = user?.id || 'guest';
     await AsyncStorage.setItem(`lastNotifRead_${uid}`, new Date().toISOString());
+  };
+
+  const deleteNotif = async (id: number) => {
+    const uid = user?.id || 'guest';
+    const newHidden = [...hiddenIds, id];
+    setHiddenIds(newHidden);
+    setData(prev => prev.filter(n => n.id !== id));
+    await AsyncStorage.setItem(`hiddenNotifs_${uid}`, JSON.stringify(newHidden));
+  };
+
+  const clearAll = async () => {
+    if (data.length === 0) return;
+    Alert.alert('Bersihkan Notifikasi', 'Hapus semua notifikasi ini dari layar Anda?', [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Ya, Bersihkan', onPress: async () => {
+        const uid = user?.id || 'guest';
+        const allIdsToHide = [...hiddenIds, ...data.map(n => n.id)];
+        setHiddenIds(allIdsToHide);
+        setData([]);
+        await AsyncStorage.setItem(`hiddenNotifs_${uid}`, JSON.stringify(allIdsToHide));
+      }}
+    ]);
   };
 
   useFocusEffect(
@@ -78,7 +110,7 @@ export default function NotificationsScreen() {
   const renderIcon = (type: string) => {
     const config = NOTIF_ICONS[type] || NOTIF_ICONS.info;
     return (
-      <View style={[styles.iconWrap, { backgroundColor: config.bg }]}>
+      <View style={[styles.iconWrap, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : config.bg }]}>
         {config.lib === 'feather' && <Feather name={config.name as any} size={20} color={config.color} />}
         {config.lib === 'ionicons' && <Ionicons name={config.name as any} size={20} color={config.color} />}
         {config.lib === 'material' && <MaterialCommunityIcons name={config.name as any} size={20} color={config.color} />}
@@ -92,28 +124,36 @@ export default function NotificationsScreen() {
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle}>{item.title}</Text>
         {item.message ? <Text style={styles.cardMessage} numberOfLines={2}>{item.message}</Text> : null}
-        <Text style={styles.cardTime}>{getTimeAgo(item.created_at)}</Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardTime}>{getTimeAgo(item.created_at)}</Text>
+          <TouchableOpacity style={styles.delBtn} onPress={() => deleteNotif(item.id)}>
+            <Feather name="x" size={14} color={colors.textSecondary} />
+            <Text style={styles.delBtnText}>Hapus</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.card} />
 
       <SafeAreaView edges={['top']} style={styles.headerArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="arrow-left" size={24} color="#0f172a" />
+            <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Notifikasi</Text>
-          <View style={{ width: 40 }} />
+          <TouchableOpacity onPress={clearAll} style={styles.clearBtn}>
+            <Feather name="trash-2" size={20} color={data.length > 0 ? colors.danger : colors.textSecondary} />
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
       {loading ? (
         <View style={styles.centerWrap}>
-          <ActivityIndicator size="large" color="#0f172a" />
+          <ActivityIndicator size="large" color={colors.text} />
           <Text style={styles.loadingText}>Memuat notifikasi...</Text>
         </View>
       ) : (
@@ -126,7 +166,7 @@ export default function NotificationsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <View style={styles.emptyIconWrap}>
-                <Feather name="bell-off" size={32} color="#cbd5e1" />
+                <Feather name="bell-off" size={32} color={colors.border} />
               </View>
               <Text style={styles.emptyTitle}>Belum ada notifikasi</Text>
               <Text style={styles.emptyDesc}>Semua pembaruan dari admin akan muncul di sini.</Text>
@@ -138,15 +178,15 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
   },
   headerArea: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
   },
   header: {
     flexDirection: 'row',
@@ -159,14 +199,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
   },
   centerWrap: {
     flex: 1,
@@ -178,7 +218,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     fontWeight: '500',
-    color: '#94a3b8',
+    color: colors.textSecondary,
   },
   listContent: {
     paddingHorizontal: 20,
@@ -187,18 +227,46 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.02,
     shadowRadius: 8,
     elevation: 1,
   },
+  
+  clearBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  delBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  delBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+
   iconWrap: {
     width: 48,
     height: 48,
@@ -213,19 +281,19 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
   cardMessage: {
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 6,
   },
   cardTime: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#94a3b8',
+    color: colors.textSecondary,
   },
   emptyBox: {
     alignItems: 'center',
@@ -236,7 +304,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -244,12 +312,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 6,
   },
   emptyDesc: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 40,
   },

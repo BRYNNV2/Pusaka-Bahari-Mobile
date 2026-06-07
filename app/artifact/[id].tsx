@@ -179,7 +179,7 @@ export default function ArtifactDetailScreen() {
   const handleShare = async () => {
     if (!artifact) return;
     await Share.share({
-      message: `📜 ${artifact.name} — ${artifact.year ?? ''}\n\nWarisan bersejarah Raja Ali Haji dari Pusaka Bahari.\n${artifact.description ?? ''}`,
+      message: `📜 ${artifact.name} — ${artifact.year ?? ''}\n\nWarisan bersejarah Raja Ali Haji dari RAHVerse.\n${artifact.description ?? ''}`,
     });
   };
 

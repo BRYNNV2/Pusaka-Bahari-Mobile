@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   Image, ScrollView, StatusBar, StyleSheet, Text, 
   TouchableOpacity, View, Modal, Dimensions, Platform, ActivityIndicator,
-  RefreshControl, LayoutAnimation, UIManager, Alert, Linking
+  RefreshControl, LayoutAnimation, UIManager, Alert, Linking, TextInput
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -13,6 +13,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useFocusEffect } from 'expo-router';
 import ImageViewing from 'react-native-image-viewing';
 import { Video, ResizeMode } from 'expo-av';
@@ -23,6 +24,8 @@ const { width, height } = Dimensions.get('window');
 const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.jpg');
 
 export default function GalleryScreen() {
+  const { mode, isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const [playlist, setPlaylist] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,6 +51,7 @@ export default function GalleryScreen() {
   const [galleryPage, setGalleryPage] = useState(0);
   const [galleryHasMore, setGalleryHasMore] = useState(true);
   const [galleryLoadingMore, setGalleryLoadingMore] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const GALLERY_PAGE_SIZE = 15;
 
@@ -154,7 +158,7 @@ export default function GalleryScreen() {
     setIsLoading(false);
   };
 
-  const fetchGalleryPhotos = async (pageNum = 0, append = false) => {
+  const fetchGalleryPhotos = async (pageNum = 0, append = false, query = searchQuery) => {
     // Set Audio Mode agar bisa berjalan meski HP di-silent
     try {
       await Audio.setAudioModeAsync({
@@ -170,10 +174,16 @@ export default function GalleryScreen() {
     const from = pageNum * GALLERY_PAGE_SIZE;
     const to = from + GALLERY_PAGE_SIZE - 1;
 
-    const { data } = await supabase
+    let queryBuilder = supabase
       .from('gallery_items')
       .select('*, artifacts(name, type, year, description)')
-      .or('image_url.neq."",video_url.neq.""')
+      .or('image_url.neq."",video_url.neq.""');
+
+    if (query) {
+      queryBuilder = queryBuilder.ilike('title', `%${query}%`);
+    }
+
+    const { data } = await queryBuilder
       .order('id', { ascending: false })
       .range(from, to);
 
@@ -192,15 +202,22 @@ export default function GalleryScreen() {
 
   const loadMoreGallery = useCallback(() => {
     if (!galleryLoadingMore && galleryHasMore) {
-      fetchGalleryPhotos(galleryPage + 1, true);
+      fetchGalleryPhotos(galleryPage + 1, true, searchQuery);
     }
   }, [galleryLoadingMore, galleryHasMore, galleryPage]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchGalleryPhotos(0, false);
+      fetchGalleryPhotos(0, false, searchQuery);
     }, [])
   );
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchGalleryPhotos(0, false, searchQuery);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   const playTrack = async (track: any) => {
     if (sound) {
@@ -352,13 +369,13 @@ export default function GalleryScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle={showPlayer ? "light-content" : "dark-content"} />
-      <SafeAreaView edges={['top']} style={{ flex: 0, backgroundColor: '#ffffff' }} />
+      <SafeAreaView edges={['top']} style={{ flex: 0, backgroundColor: colors.card }} />
       
       <ScrollView 
         contentContainerStyle={styles.scrollContainer} 
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0f172a']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.text]} />
         }
       >
         <View style={styles.header}>
@@ -366,14 +383,34 @@ export default function GalleryScreen() {
           <Text style={styles.headerDesc}>Dengarkan mahakarya & jelajahi koleksi foto pusaka.</Text>
         </View>
 
+        
+        {/* Search Bar */}
+        <View style={styles.searchWrapper}>
+          <View style={styles.searchBar}>
+            <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cari foto, video, atau musik..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Feather name="x" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
         <Text style={styles.sectionTitle}>Daftar Putar</Text>
         <View style={styles.audioList}>
           {isLoading ? (
-            <ActivityIndicator size="large" color="#0f172a" style={{ marginVertical: 20 }} />
+            <ActivityIndicator size="large" color={colors.text} style={{ marginVertical: 20 }} />
           ) : playlist.length === 0 ? (
-            <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Belum ada audio yang diunggah.</Text>
+            <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>Belum ada audio yang diunggah.</Text>
           ) : (
-            playlist.map(item => (
+            playlist.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.desc.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
               <TouchableOpacity 
                 key={item.id} 
                 style={styles.audioCard}
@@ -386,7 +423,7 @@ export default function GalleryScreen() {
                   <Text style={styles.audioDesc}>{item.desc}</Text>
                 </View>
                 <View style={styles.playBtnSmall}>
-                  <Feather name="play" size={16} color="#0f172a" style={{ marginLeft: 2 }} />
+                  <Feather name="play" size={16} color={colors.text} style={{ marginLeft: 2 }} />
                 </View>
               </TouchableOpacity>
             ))
@@ -394,14 +431,14 @@ export default function GalleryScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>Galeri Visual</Text>
-        <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, paddingHorizontal: 20 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 16, paddingHorizontal: 20 }}>
           {artifactsData.length} koleksi foto & video artefak bersejarah
         </Text>
         
         {artifactsData.length === 0 ? (
           <View style={{ padding: 30, alignItems: 'center' }}>
             <Feather name="image" size={40} color="#cbd5e1" style={{ marginBottom: 12 }} />
-            <Text style={{ color: '#94a3b8', fontStyle: 'italic' }}>Belum ada media visual.</Text>
+            <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>Belum ada media visual.</Text>
           </View>
         ) : (
           <View style={{ paddingHorizontal: 16 }}>
@@ -425,13 +462,13 @@ export default function GalleryScreen() {
                     {item.video_url && (
                       <View style={styles.videoPlayOverlay}>
                         <View style={styles.videoPlayBtn}>
-                          <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+                          <Feather name="play" size={20} color={colors.background} style={{ marginLeft: 2 }} />
                         </View>
                       </View>
                     )}
                     <View style={styles.exploreOverlay}>
                       <View style={[styles.exploreTypeBadge, item.video_url && { backgroundColor: 'rgba(239,68,68,0.7)', borderColor: 'rgba(239,68,68,0.5)' }]}>
-                        <Feather name={item.video_url ? 'film' : 'image'} size={9} color="#fff" style={{ marginRight: 4 }} />
+                        <Feather name={item.video_url ? 'film' : 'image'} size={9} color={colors.background} style={{ marginRight: 4 }} />
                         <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || 'Foto')}</Text>
                       </View>
                       <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
@@ -457,13 +494,13 @@ export default function GalleryScreen() {
                     {item.video_url && (
                       <View style={styles.videoPlayOverlay}>
                         <View style={styles.videoPlayBtn}>
-                          <Feather name="play" size={20} color="#fff" style={{ marginLeft: 2 }} />
+                          <Feather name="play" size={20} color={colors.background} style={{ marginLeft: 2 }} />
                         </View>
                       </View>
                     )}
                     <View style={styles.exploreOverlay}>
                       <View style={[styles.exploreTypeBadge, item.video_url && { backgroundColor: 'rgba(239,68,68,0.7)', borderColor: 'rgba(239,68,68,0.5)' }]}>
-                        <Feather name={item.video_url ? 'film' : 'image'} size={9} color="#fff" style={{ marginRight: 4 }} />
+                        <Feather name={item.video_url ? 'film' : 'image'} size={9} color={colors.background} style={{ marginRight: 4 }} />
                         <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || 'Foto')}</Text>
                       </View>
                       <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
@@ -476,15 +513,15 @@ export default function GalleryScreen() {
             {galleryHasMore && artifactsData.length > 0 && (
               <TouchableOpacity 
                 onPress={loadMoreGallery}
-                style={{ marginTop: 8, paddingVertical: 14, backgroundColor: '#f1f5f9', borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+                style={{ marginTop: 8, paddingVertical: 14, backgroundColor: colors.border, borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
                 activeOpacity={0.7}
               >
                 {galleryLoadingMore ? (
-                  <ActivityIndicator size="small" color="#64748b" />
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
                 ) : (
                   <>
-                    <Feather name="plus-circle" size={16} color="#64748b" />
-                    <Text style={{ color: '#64748b', fontWeight: '600', fontSize: 14 }}>Muat Lebih Banyak</Text>
+                    <Feather name="plus-circle" size={16} color={colors.textSecondary} />
+                    <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 14 }}>Muat Lebih Banyak</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -509,9 +546,9 @@ export default function GalleryScreen() {
                     onPress={() => setSelectedPhoto(null)} 
                     style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
                   >
-                    <Feather name="chevron-left" size={22} color="#ffffff" />
+                    <Feather name="chevron-left" size={22} color={'#ffffff'} />
                   </TouchableOpacity>
-                  <Text style={{ color: 'white', fontSize: 16, fontWeight: '700', alignSelf: 'center' }}>Pemutar Video</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', alignSelf: 'center' }}>Pemutar Video</Text>
                   <View style={{ width: 44 }} />
                 </View>
 
@@ -528,8 +565,8 @@ export default function GalleryScreen() {
                         onPress={() => Linking.openURL(selectedPhoto.video_url)}
                         activeOpacity={0.8}
                       >
-                        <Feather name="external-link" size={16} color="#ffffff" style={{ marginRight: 8 }} />
-                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>Tonton di YouTube</Text>
+                        <Feather name="external-link" size={16} color={'#ffffff'} style={{ marginRight: 8 }} />
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>Tonton di YouTube</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -547,7 +584,7 @@ export default function GalleryScreen() {
                 <ScrollView style={{ flex: 1, padding: 20 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
                     <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                      <Ionicons name="location" size={22} color="#ffffff" />
+                      <Ionicons name="location" size={22} color={'#ffffff'} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
@@ -595,13 +632,13 @@ export default function GalleryScreen() {
                       onPress={() => setSelectedPhoto(null)} 
                       style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
                     >
-                      <Feather name="chevron-left" size={22} color="#ffffff" />
+                      <Feather name="chevron-left" size={22} color={'#ffffff'} />
                     </TouchableOpacity>
                     <TouchableOpacity 
                       onPress={() => setZoomImageUri(selectedPhoto.image_url)}
                       style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }}
                     >
-                      <Feather name="zoom-in" size={20} color="#ffffff" />
+                      <Feather name="zoom-in" size={20} color={'#ffffff'} />
                     </TouchableOpacity>
                   </View>
                 </SafeAreaView>
@@ -611,7 +648,7 @@ export default function GalleryScreen() {
                   <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: height * 0.45 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
                       <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                        <Ionicons name="location" size={22} color="#ffffff" />
+                        <Ionicons name="location" size={22} color={'#ffffff'} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
@@ -653,7 +690,7 @@ export default function GalleryScreen() {
                         style={[styles.photoCloseBtn, { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)' }]}
                         activeOpacity={0.8}
                       >
-                        <Feather name="zoom-in" size={16} color="#ffffff" />
+                        <Feather name="zoom-in" size={16} color={'#ffffff'} />
                         <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Perbesar</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
@@ -686,7 +723,7 @@ export default function GalleryScreen() {
 
       {/* SPOTIFY-STYLE MUSIC PLAYER MODAL */}
       <Modal visible={showPlayer} animationType="slide" presentationStyle="fullScreen">
-        <LinearGradient colors={['#334155', '#0f172a']} style={styles.playerContainer}>
+        <LinearGradient colors={['#0f172a', '#0f172a']} style={styles.playerContainer}>
           <SafeAreaView style={{flex: 1}}>
             {/* TAMPILAN PEMUTAR UTAMA (Normal) */}
             <View style={{ flex: 1 }}>
@@ -730,7 +767,7 @@ export default function GalleryScreen() {
                     <Ionicons name="play-skip-back" size={32} color="white" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtnLarge}>
-                    <Ionicons name={isPlaying ? "pause" : "play"} size={40} color="#0f172a" style={!isPlaying ? {marginLeft: 4} : {}} />
+                    <Ionicons name={isPlaying ? "pause" : "play"} size={40} color={'#0f172a'} style={!isPlaying ? {marginLeft: 4} : {}} />
                   </TouchableOpacity>
                   <TouchableOpacity>
                     <Ionicons name="play-skip-forward" size={32} color="white" />
@@ -744,7 +781,7 @@ export default function GalleryScreen() {
                   <Text style={styles.bottomNavText}>Berikutnya</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => openExpandedView('lyrics')} style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={[styles.bottomNavText, { color: 'white', fontWeight: 'bold' }]}>Lirik</Text>
+                  <Text style={[styles.bottomNavText, { color: '#ffffff', fontWeight: 'bold' }]}>Lirik</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => openExpandedView('ai')} style={{ flex: 1, alignItems: 'center' }}>
                   <Text style={styles.bottomNavText}>Bedah AI</Text>
@@ -760,7 +797,7 @@ export default function GalleryScreen() {
 
       {/* --- MODAL LIRIK FULL SCREEN (Animasi Slide Halus) --- */}
       <Modal visible={isExpanded} animationType="slide" presentationStyle="fullScreen">
-        <LinearGradient colors={['#1e293b', '#0f172a']} style={{ flex: 1 }}>
+        <LinearGradient colors={['#0f172a', '#0f172a']} style={{ flex: 1 }}>
           <SafeAreaView style={{ flex: 1 }}>
             <View style={{ flex: 1 }}>
               {/* Header Mini */}
@@ -771,7 +808,7 @@ export default function GalleryScreen() {
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
                   <Image source={activeTrack?.img} style={{ width: 44, height: 44, borderRadius: 6 }} />
                   <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }} numberOfLines={1}>{activeTrack?.title}</Text>
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 16 }} numberOfLines={1}>{activeTrack?.title}</Text>
                     <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13 }} numberOfLines={1}>{activeTrack?.desc}</Text>
                   </View>
                 </View>
@@ -805,7 +842,7 @@ export default function GalleryScreen() {
                       return (
                         <Text key={index} style={[
                           styles.lyricText, 
-                          isPlain ? { color: 'white', opacity: 0.9, marginBottom: 8 } : {},
+                          isPlain ? { color: '#ffffff', opacity: 0.9, marginBottom: 8 } : {},
                           hasTimestamps && !isActive ? { color: 'rgba(255,255,255,0.4)' } : {},
                           isActive && styles.lyricTextActive, 
                           { textAlign: 'left' }
@@ -823,7 +860,7 @@ export default function GalleryScreen() {
                     <View style={{ marginTop: 10, padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                         <Ionicons name="sparkles" size={20} color="#f59e0b" />
-                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16, marginLeft: 8 }}>Bedah Lirik (RAH VerseAI)</Text>
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 16, marginLeft: 8 }}>Bedah Lirik (RAH VerseAI)</Text>
                       </View>
                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 16, lineHeight: 20 }}>
                         Dapatkan penjelasan mendalam tentang makna dan filosofi lirik lagu atau naskah ini.
@@ -831,13 +868,13 @@ export default function GalleryScreen() {
                       
                       {aiExplanation ? (
                         <View style={{ marginTop: 10, padding: 16, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 12 }}>
-                          <Text style={{ color: 'white', fontSize: 15, lineHeight: 24 }}>{aiExplanation}</Text>
+                          <Text style={{ color: '#ffffff', fontSize: 15, lineHeight: 24 }}>{aiExplanation}</Text>
                         </View>
                       ) : aiLoading ? (
                         <ActivityIndicator color="#f59e0b" style={{ marginVertical: 20 }} />
                       ) : (
                         <TouchableOpacity 
-                          style={{ backgroundColor: '#f59e0b', paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                          style={{ backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
                           onPress={fetchAiExplanation}
                         >
                           <Text style={{ color: '#0f172a', fontWeight: 'bold', fontSize: 15 }}>✨ Mulai Bedah Makna</Text>
@@ -857,7 +894,7 @@ export default function GalleryScreen() {
                       >
                         <Image source={item.img} style={styles.audioThumb} />
                         <View style={styles.audioInfo}>
-                          <Text style={[styles.audioTitle, { color: 'white' }]}>{item.title}</Text>
+                          <Text style={[styles.audioTitle, { color: '#ffffff' }]}>{item.title}</Text>
                           <Text style={[styles.audioDesc, { color: 'rgba(255,255,255,0.6)' }]}>{item.desc}</Text>
                         </View>
                       </TouchableOpacity>
@@ -880,7 +917,7 @@ export default function GalleryScreen() {
                       >
                         <Image source={item.img} style={styles.audioThumb} />
                         <View style={styles.audioInfo}>
-                          <Text style={[styles.audioTitle, { color: 'white' }]}>{item.title}</Text>
+                          <Text style={[styles.audioTitle, { color: colors.card }]}>{item.title}</Text>
                           <Text style={[styles.audioDesc, { color: 'rgba(255,255,255,0.6)' }]}>{item.desc}</Text>
                         </View>
                       </TouchableOpacity>
@@ -901,11 +938,34 @@ export default function GalleryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.background,
   },
+  
+  searchWrapper: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 15,
+    color: colors.text,
+  },
+
   scrollContainer: {
     paddingHorizontal: 24,
     paddingTop: 24,
@@ -916,19 +976,19 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
     letterSpacing: -1,
     marginBottom: 8,
   },
   headerDesc: {
     fontSize: 16,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 24,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 16,
     letterSpacing: -0.5,
   },
@@ -940,7 +1000,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.border,
   },
   audioThumb: {
     width: 60,
@@ -954,21 +1014,21 @@ const styles = StyleSheet.create({
   audioTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
   audioDesc: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.textSecondary,
     lineHeight: 20,
   },
   playBtnSmall: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -988,7 +1048,7 @@ const styles = StyleSheet.create({
   gridText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.text,
     marginBottom: 4,
   },
 
@@ -1034,7 +1094,7 @@ const styles = StyleSheet.create({
   playerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: 'white',
+    color: colors.card,
     marginBottom: 8,
   },
   playerDesc: {
@@ -1053,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: 'white',
+    backgroundColor: colors.card,
     borderRadius: 2,
   },
   timeContainer: {
@@ -1076,7 +1136,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'white',
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1099,7 +1159,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   lyricTextActive: {
-    color: 'white',
+    color: colors.card,
     fontSize: 28,
     fontWeight: '800',
     opacity: 1,
@@ -1126,7 +1186,7 @@ const styles = StyleSheet.create({
   },
   expandedTabActive: {
     borderBottomWidth: 3,
-    borderBottomColor: 'white',
+    borderBottomColor: colors.card,
   },
   expandedTabText: {
     color: 'rgba(255,255,255,0.5)',
@@ -1134,7 +1194,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   expandedTabTextActive: {
-    color: 'white',
+    color: colors.card,
     fontWeight: '700',
   },
   expandedContent: {
@@ -1147,7 +1207,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: colors.border,
     position: 'relative',
     marginBottom: 10,
     shadowColor: '#000',
@@ -1200,12 +1260,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exploreTypeText: {
-    color: '#ffffff',
+    color: colors.card,
     fontSize: 10,
     fontWeight: '700',
   },
   exploreName: {
-    color: '#ffffff',
+    color: colors.card,
     fontSize: 14,
     fontWeight: '700',
   },
