@@ -22,24 +22,25 @@ Dirancang dengan standar *premium-grade UI/UX*, aplikasi ini menyatukan estetika
 ## ✨ Fitur Unggulan
 
 ### 🎨 Premium UI/UX (Sultan Design)
+- **True Dark/Light Theme** — Transisi tema mulus tanpa *flash* yang didukung penuh di seluruh halaman, beradaptasi dengan preferensi pengguna.
 - **Liquid Glass Tab Bar** — Navigasi bawah melayang (*floating*) bergaya *frosted glass* (efek kaca blur) dengan fisika perpindahan presisi.
-- **Article-Style Gallery Viewer** — Resolusi tinggi galeri artefak yang di-desain menyerupai bacaan artikel majalah premium, lengkap dengan dukungan geser (swipe) dan gestur cubit untuk perbesar (*pinch-to-zoom*).
-- **Dynamic Asymmetric Buttons** — Tombol utama asimetris yang futuristik dengan status jam operasional *Real-Time* (Parsing otomatis teks "24 Jam" / "Tutup").
+- **Article-Style Gallery Viewer** — Resolusi tinggi galeri artefak yang didesain menyerupai bacaan artikel majalah premium, lengkap dengan *pinch-to-zoom*.
+- **Skeleton & Cross-Fade Loading** — Efek *shimmer/pulse* canggih dari Reanimated dan transisi layar mulus tanpa *layout shift* yang mengganggu.
 
-### 📊 Eksplorasi Data Real-Time
-- **Hero Dashboard** — Beranda dengan paralaks karosel gambar penuh dan *pill badge* kategori.
-- **Arsip Peninggalan** — Penyaringan naskah, artefak, dan monumen yang terintegrasi langsung ke cloud database.
-- **Agenda Budaya** — Pelacakan tanggal kegiatan sejarah dengan kartu horizontal.
+### 📊 Eksplorasi & Media Interaktif
+- **Hero Dashboard** — Beranda dengan paralaks karosel gambar penuh dan lencana pintar adaptif.
+- **Spotify-Style Audio Player** — Pemutar audio eksklusif untuk mendengarkan gurindam/sejarah dengan antarmuka premium dan pemutaran sinkron.
+- **Peta Pintar Terintegrasi** — Visualisasi lokasi monumen dan peninggalan bersejarah secara presisi.
 
 ### 🔐 Autentikasi & Personalisasi Terpusat
-- **Supabase Auth** — Sistem login dan mode tamu (*Guest Mode*) yang efisien.
-- **Profil Dinamis** — Unggah/Edit avatar dan bio dengan penyimpanan bucket `Supabase Storage`.
-- **Manajemen Kredensial** — Verifikasi sandi ganda (*Old Password & New Password*).
+- **Supabase Auth** — Sistem login kuat dan mode tamu (*Guest Mode*) yang tangguh.
+- **Profil Dinamis** — Unggah/Edit avatar dan formulir pengguna menggunakan *bucket* `Supabase Storage`.
+- **Manajemen Kredensial** — Verifikasi pembaruan kata sandi ganda yang aman.
 
 ### 🛠️ Admin Control Center
-Akses eksklusif *Super Admin* tanpa perlu aplikasi terpisah:
-- **Pending Upload Flow** — Formulir perantara wajib isi (Judul & Deskripsi) sebelum unggahan foto permanen ke galeri artefak.
-- **Full CRUD** — Mengelola seluruh entitas data (Artefak, Agenda, Galeri) langsung dari *smartphone*.
+Akses eksklusif *Super Admin* langsung dari dalam aplikasi:
+- **Pending Upload Flow** — Formulir pratinjau sebelum mengunggah foto secara permanen ke galeri.
+- **Full CRUD** — Mengelola entitas sejarah (Artefak, Agenda, Galeri, Audio) langsung dari ujung jari Anda.
 
 ---
 
