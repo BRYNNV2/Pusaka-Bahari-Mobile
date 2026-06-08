@@ -4,12 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
 export default function AppInfoScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { t } = useLanguage();
 
   const styles = getStyles(colors, isDark);
 
@@ -20,7 +22,7 @@ export default function AppInfoScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Informasi Aplikasi</Text>
+        <Text style={styles.headerTitle}>{t('infoHeaderTitle')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -35,37 +37,37 @@ export default function AppInfoScreen() {
             />
           </View>
           <Text style={appNameStyle(colors)}>RAHVerse</Text>
-          <Text style={styles.appVersion}>Versi 1.0.0 (Build 26)</Text>
-          <Text style={styles.appTagline}>Warisan Budaya & Pusaka Bahari Nusantara</Text>
+          <Text style={styles.appVersion}>{t('infoVersion')}</Text>
+          <Text style={styles.appTagline}>{t('infoTagline')}</Text>
         </View>
 
         {/* Detailed Info Cards */}
         <View style={styles.infoGroup}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Pengembang</Text>
-            <Text style={styles.infoValue}>Tim RAHVerse</Text>
+            <Text style={styles.infoLabel}>{t('infoLabelDev')}</Text>
+            <Text style={styles.infoValue}>{t('infoValueDev')}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Rilis Pertama</Text>
-            <Text style={styles.infoValue}>Juni 2026</Text>
+            <Text style={styles.infoLabel}>{t('infoLabelRelease')}</Text>
+            <Text style={styles.infoValue}>{t('infoValueRelease')}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Kerangka Kerja</Text>
+            <Text style={styles.infoLabel}>{t('infoLabelFramework')}</Text>
             <Text style={styles.infoValue}>Expo (React Native)</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Database Cloud</Text>
+            <Text style={styles.infoLabel}>{t('infoLabelDB')}</Text>
             <Text style={styles.infoValue}>Supabase Security</Text>
           </View>
         </View>
 
         {/* Copyright Footer */}
         <View style={styles.footerSection}>
-          <Text style={styles.copyrightText}>© 2026 RAHVerse. Hak Cipta Dilindungi.</Text>
-          <Text style={styles.subCopyrightText}>Dibuat dengan rasa cinta terhadap warisan bahari Indonesia.</Text>
+          <Text style={styles.copyrightText}>{t('infoCopyright')}</Text>
+          <Text style={styles.subCopyrightText}>{t('infoSubCopyright')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -31,6 +31,7 @@ import Animated, {
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
 
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, isLoggedIn, isAdmin, logout } = useAuth();
   const { mode, isDark, colors, setMode } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   
   const styles = getStyles(colors, isDark);
 
@@ -77,6 +79,7 @@ export default function ProfileScreen() {
   const [uploading, setUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPass, setIsChangingPass] = useState(false);
+  const [expandedSetting, setExpandedSetting] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || user?.email?.split('@')[0] || '');
   const [bio, setBio]           = useState('');
@@ -328,7 +331,7 @@ export default function ProfileScreen() {
                   </View>
                 )}
                 <TouchableOpacity onPress={() => pickImage('gallery')} style={styles.editAvatarBtn} disabled={uploading} activeOpacity={0.8}>
-                  <Feather name="camera" size={14} color="#ffffff" />
+                  <Feather name="camera" size={14} color={colors.background} />
                 </TouchableOpacity>
               </View>
             )}
@@ -345,7 +348,7 @@ export default function ProfileScreen() {
                 <Text style={styles.profileNameTxt}>{fullName || 'Pengguna Anonim'}</Text>
                 { isAdmin && (
                   <View style={styles.adminBadge}>
-                    <MaterialCommunityIcons name="shield-star" size={14} color="#0f172a" />
+                    <MaterialCommunityIcons name="shield-star" size={14} color={colors.text} />
                     <Text style={styles.adminBadgeTxt}>Admin Terverifikasi</Text>
                   </View>
                 )}
@@ -357,48 +360,44 @@ export default function ProfileScreen() {
             
             <View style={styles.actionRowBtn}>
               <TouchableOpacity style={styles.primaryBtn} onPress={() => setIsEditing(true)} activeOpacity={0.8} disabled={loading}>
-                <Feather name="edit-3" size={14} color="#ffffff" />
-                <Text style={styles.primaryBtnTxt}>Ubah Profil</Text>
+                <Feather name="edit-3" size={14} color={colors.background} />
+                <Text style={styles.primaryBtnTxt}>{t('editProfile')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.secondaryBtn} onPress={() => setIsChangingPass(true)} activeOpacity={0.8} disabled={loading}>
-                <Feather name="lock" size={14} color="#0f172a" />
-                <Text style={styles.secondaryBtnTxt}>Ubah Sandi</Text>
+                <Feather name="lock" size={14} color={colors.text} />
+                <Text style={styles.secondaryBtnTxt}>{t('editPassword')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Theme Switcher */}
+          
+
+          {/* Koleksi Pribadi */}
           <View style={styles.sectionGroup}>
-            <Text style={styles.sectionHeaderTxt}>Tampilan Tema</Text>
-            <View style={styles.themeSelectorRow}>
-              <TouchableOpacity onPress={() => setMode('light')} style={[styles.themeBtn, mode === 'light' && styles.themeBtnActive]}>
-                <Feather name="sun" size={16} color={mode === 'light' ? colors.background : colors.textSecondary} />
-                <Text style={[styles.themeBtnTxt, mode === 'light' && styles.themeBtnTxtActive]}>Terang</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setMode('dark')} style={[styles.themeBtn, mode === 'dark' && styles.themeBtnActive]}>
-                <Feather name="moon" size={16} color={mode === 'dark' ? colors.background : colors.textSecondary} />
-                <Text style={[styles.themeBtnTxt, mode === 'dark' && styles.themeBtnTxtActive]}>Gelap</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setMode('system')} style={[styles.themeBtn, mode === 'system' && styles.themeBtnActive]}>
-                <Feather name="smartphone" size={16} color={mode === 'system' ? colors.background : colors.textSecondary} />
-                <Text style={[styles.themeBtnTxt, mode === 'system' && styles.themeBtnTxtActive]}>Sistem</Text>
-              </TouchableOpacity>
+            <Text style={styles.sectionHeaderTxt}>{t('collections')}</Text>
+            <View style={styles.menuCard}>
+              <MenuRow 
+                icon="bookmark" 
+                title={t('savedGallery')} 
+                sub={t('savedDesc')} 
+                onPress={() => router.push('/collections')} 
+              />
             </View>
           </View>
 
           {/* Account Protection Card */}
           <View style={styles.sectionGroup}>
-            <Text style={styles.sectionHeaderTxt}>Keamanan Data</Text>
+            <Text style={styles.sectionHeaderTxt}>{t('security')}</Text>
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardIconWrap}>
-                  <MaterialCommunityIcons name="shield-check" size={24} color="#0f172a" />
+                  <MaterialCommunityIcons name="shield-check" size={24} color={colors.text} />
                 </View>
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Status Perlindungan</Text>
-                  <Text style={styles.cardSub}>Data terlindungi enkripsi</Text>
+                  <Text style={styles.cardTitle}>{t('protection')}</Text>
+                  <Text style={styles.cardSub}>{t('protected')}</Text>
                 </View>
-                <Text style={styles.percentTxt}>Aman</Text>
+                <Text style={styles.percentTxt}>{t('safe')}</Text>
               </View>
               
               <View style={styles.progressBarWrapper}>
@@ -410,12 +409,12 @@ export default function ProfileScreen() {
           {/* Admin Menu */}
           {isAdmin && (
             <View style={styles.sectionGroup}>
-              <Text style={styles.sectionHeaderTxt}>Administrator</Text>
+              <Text style={styles.sectionHeaderTxt}>{t('adminMenu')}</Text>
               <View style={styles.menuCard}>
                 <MenuRow 
                   icon="database" 
-                  title="Kelola Data Admin" 
-                  sub="Tambah, ubah, dan hapus data pusaka" 
+                  title={t('manageAdmin')} 
+                  sub={t('manageAdminDesc')} 
                   onPress={() => router.push('/admin')} 
                 />
               </View>
@@ -424,26 +423,70 @@ export default function ProfileScreen() {
 
           {/* App Settings Group */}
           <View style={styles.sectionGroup}>
-            <Text style={styles.sectionHeaderTxt}>Lainnya</Text>
+            <Text style={styles.sectionHeaderTxt}>{t('others')}</Text>
             <View style={styles.menuCard}>
+              
+              {/* Theme Dropdown */}
+              <MenuRow 
+                icon={mode === 'light' ? 'sun' : mode === 'dark' ? 'moon' : 'smartphone'} 
+                title={t('theme')} 
+                sub={mode === 'light' ? t('light') : mode === 'dark' ? t('dark') : t('system')} 
+                rightIcon={expandedSetting === 'theme' ? 'chevron-up' : 'chevron-down'}
+                onPress={() => setExpandedSetting(expandedSetting === 'theme' ? null : 'theme')} 
+              />
+              {expandedSetting === 'theme' && (
+                <View style={{ backgroundColor: colors.backgroundSecondary, paddingHorizontal: 20, paddingVertical: 8 }}>
+                  <TouchableOpacity onPress={() => { setMode('light'); setExpandedSetting(null); }} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Text style={{ color: mode === 'light' ? colors.primary : colors.text, fontWeight: mode === 'light' ? 'bold' : 'normal' }}>☀️  {t('light')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setMode('dark'); setExpandedSetting(null); }} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Text style={{ color: mode === 'dark' ? colors.primary : colors.text, fontWeight: mode === 'dark' ? 'bold' : 'normal' }}>🌙  {t('dark')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setMode('system'); setExpandedSetting(null); }} style={{ paddingVertical: 12 }}>
+                    <Text style={{ color: mode === 'system' ? colors.primary : colors.text, fontWeight: mode === 'system' ? 'bold' : 'normal' }}>📱  {t('system')}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <View style={styles.divider} />
+
+              {/* Language Dropdown */}
+              <MenuRow 
+                icon="globe" 
+                title={t('language')} 
+                sub={language === 'id' ? 'Bahasa Indonesia' : 'English'} 
+                rightIcon={expandedSetting === 'language' ? 'chevron-up' : 'chevron-down'}
+                onPress={() => setExpandedSetting(expandedSetting === 'language' ? null : 'language')} 
+              />
+              {expandedSetting === 'language' && (
+                <View style={{ backgroundColor: colors.backgroundSecondary, paddingHorizontal: 20, paddingVertical: 8 }}>
+                  <TouchableOpacity onPress={() => { setLanguage('id'); setExpandedSetting(null); }} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                    <Text style={{ color: language === 'id' ? colors.primary : colors.text, fontWeight: language === 'id' ? 'bold' : 'normal' }}>🇮🇩  Bahasa Indonesia</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setLanguage('en'); setExpandedSetting(null); }} style={{ paddingVertical: 12 }}>
+                    <Text style={{ color: language === 'en' ? colors.primary : colors.text, fontWeight: language === 'en' ? 'bold' : 'normal' }}>🇬🇧  English</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <View style={styles.divider} />
+
               <MenuRow 
                 icon="help-circle" 
-                title="Pusat Layanan" 
-                sub="Tanya jawab & bantuan pengguna" 
+                title={t('helpCenter')} 
+                sub={t('helpCenterDesc')} 
                 onPress={() => router.push('/help-center')}
               />
               <View style={styles.divider} />
               <MenuRow 
                 icon="file-text" 
-                title="Syarat Ketentuan" 
-                sub="Regulasi dan kebijakan data" 
+                title={t('terms')} 
+                sub={t('termsDesc')} 
                 onPress={() => router.push('/terms')}
               />
               <View style={styles.divider} />
               <MenuRow 
                 icon="info" 
-                title="Informasi Aplikasi" 
-                sub="Versi 1.0.0 (Release)" 
+                title={t('appInfo')} 
+                sub={t('appInfoDesc')} 
                 onPress={() => router.push('/app-info')}
               />
             </View>
@@ -457,7 +500,7 @@ export default function ProfileScreen() {
               activeOpacity={0.8}
             >
               <Feather name="log-out" size={18} color="#ef4444" />
-              <Text style={styles.logoutTxt}>Keluar Akun</Text>
+              <Text style={styles.logoutTxt}>{t('logout')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -472,25 +515,25 @@ export default function ProfileScreen() {
             <Animated.View entering={SlideInDown.duration(350)} style={styles.bottomSheet}>
               <View style={styles.dragIndicator} />
               <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Ubah Profil</Text>
+                <Text style={styles.sheetTitle}>{t('profModalEditTitle')}</Text>
                 <TouchableOpacity onPress={cancelEdit}><Feather name="x" size={24} color="#64748b" /></TouchableOpacity>
               </View>
               
               <View style={styles.inputBox}>
-                <Text style={styles.inputLabel}>Nama Lengkap</Text>
-                <TextInput style={styles.input} value={fullName} onChangeText={setFullName} placeholder="Ketik nama lengkap..." placeholderTextColor="#94a3b8" />
+                <Text style={styles.inputLabel}>{t('profModalFullName')}</Text>
+                <TextInput style={styles.input} value={fullName} onChangeText={setFullName} placeholder={t('profModalFullNamePlaceholder')} placeholderTextColor="#94a3b8" />
               </View>
               <View style={styles.inputBox}>
-                <Text style={styles.inputLabel}>Nomor Handphone</Text>
-                <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="Ketik nomor telpon aktif..." placeholderTextColor="#94a3b8" />
+                <Text style={styles.inputLabel}>{t('profModalPhone')}</Text>
+                <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder={t('profModalPhonePlaceholder')} placeholderTextColor="#94a3b8" />
               </View>
               <View style={styles.inputBox}>
-                <Text style={styles.inputLabel}>Informasi Singkat (Bio)</Text>
-                <TextInput style={[styles.input, { height: 90, textAlignVertical: 'top' }]} value={bio} onChangeText={setBio} multiline placeholder="Tambahkan informasi singkat..." placeholderTextColor="#94a3b8" />
+                <Text style={styles.inputLabel}>{t('profModalBio')}</Text>
+                <TextInput style={[styles.input, { height: 90, textAlignVertical: 'top' }]} value={bio} onChangeText={setBio} multiline placeholder={t('profModalBioPlaceholder')} placeholderTextColor="#94a3b8" />
               </View>
 
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving} activeOpacity={0.8}>
-                {saving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveBtnText}>Simpan Perubahan</Text>}
+                {saving ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveBtnText}>{t('profModalSave')}</Text>}
               </TouchableOpacity>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -505,25 +548,25 @@ export default function ProfileScreen() {
             <Animated.View entering={SlideInDown.duration(350)} style={styles.bottomSheet}>
               <View style={styles.dragIndicator} />
               <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Perbarui Sandi</Text>
+                <Text style={styles.sheetTitle}>{t('profModalPassTitle')}</Text>
                 <TouchableOpacity onPress={() => setIsChangingPass(false)}><Feather name="x" size={24} color="#64748b" /></TouchableOpacity>
               </View>
 
               <View style={styles.inputBox}>
-                <Text style={styles.inputLabel}>Sandi Lama</Text>
-                <TextInput style={styles.input} value={oldPassword} onChangeText={setOldPassword} secureTextEntry placeholder="Ketik sandi saat ini..." placeholderTextColor="#94a3b8" />
+                <Text style={styles.inputLabel}>{t('profModalOldPass')}</Text>
+                <TextInput style={styles.input} value={oldPassword} onChangeText={setOldPassword} secureTextEntry placeholder={t('profModalOldPassPlaceholder')} placeholderTextColor="#94a3b8" />
               </View>
               <View style={styles.inputBox}>
-                <Text style={styles.inputLabel}>Sandi Baru</Text>
-                <TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder="Ketik sandi baru..." placeholderTextColor="#94a3b8" />
+                <Text style={styles.inputLabel}>{t('profModalNewPass')}</Text>
+                <TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry placeholder={t('profModalNewPassPlaceholder')} placeholderTextColor="#94a3b8" />
               </View>
               <View style={styles.inputBox}>
-                <Text style={styles.inputLabel}>Konfirmasi Sandi Baru</Text>
-                <TextInput style={styles.input} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry placeholder="Ketik ulang sandi baru..." placeholderTextColor="#94a3b8" />
+                <Text style={styles.inputLabel}>{t('profModalConfirmPass')}</Text>
+                <TextInput style={styles.input} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry placeholder={t('profModalConfirmPassPlaceholder')} placeholderTextColor="#94a3b8" />
               </View>
 
               <TouchableOpacity style={styles.saveBtn} onPress={handleUpdatePassword} disabled={loadingPass} activeOpacity={0.8}>
-                {loadingPass ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveBtnText}>Perbarui Sandi</Text>}
+                {loadingPass ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.saveBtnText}>{t('profModalPassTitle')}</Text>}
               </TouchableOpacity>
             </Animated.View>
           </KeyboardAvoidingView>
@@ -535,7 +578,7 @@ export default function ProfileScreen() {
   );
 }
 
-function MenuRow({ icon, title, sub, onPress }: any) {
+function MenuRow({ icon, title, sub, onPress, rightIcon = "chevron-right" }: any) {
   const { colors } = useTheme();
   return (
     <TouchableOpacity onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }} activeOpacity={0.7}>
@@ -546,7 +589,7 @@ function MenuRow({ icon, title, sub, onPress }: any) {
         <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', marginBottom: 2 }}>{title}</Text>
         {sub && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{sub}</Text>}
       </View>
-      <Feather name="chevron-right" size={18} color={colors.textSecondary} />
+      <Feather name={rightIcon} size={18} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }

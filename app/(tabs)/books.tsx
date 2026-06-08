@@ -19,6 +19,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
@@ -40,6 +41,7 @@ const PAGE_SIZE = 10;
 
 export default function BooksScreen() {
   const { mode, isDark, colors } = useTheme();
+  const { t } = useLanguage();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const [books, setBooks] = useState<BookItem[]>([]);
@@ -102,7 +104,7 @@ export default function BooksScreen() {
 
   const openBook = (book: BookItem) => {
     if (!book.file_url) {
-      Alert.alert('File Belum Tersedia', 'Dokumen untuk buku ini belum diunggah oleh admin.');
+      Alert.alert(t('booksFileNotAvailable'), t('booksFileNotUploaded'));
       return;
     }
     // Buka In-App PDF Viewer
@@ -137,7 +139,7 @@ export default function BooksScreen() {
       <View style={styles.bookInfo}>
         <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.bookAuthor} numberOfLines={1}>
-          {item.author || 'Anonim'}
+          {item.author || t('anonymous')}
         </Text>
       </View>
     </TouchableOpacity>
@@ -163,21 +165,21 @@ export default function BooksScreen() {
         />
         
         <View style={styles.heroContent}>
-          <Text style={styles.heroTitle}>Pustaka Nusantara</Text>
+          <Text style={styles.heroTitle}>{t('booksHeroTitle')}</Text>
           <Text style={styles.heroSub}>
-            Eksplorasi arsip naskah kuno dan literatur warisan sejarah maritim Kepulauan Riau.
+            {t('booksHeroSub')}
           </Text>
 
           {/* Stats Row */}
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatItem}>
               <Text style={styles.heroStatNum}>{totalBooks}</Text>
-              <Text style={styles.heroStatLabel}>Koleksi</Text>
+              <Text style={styles.heroStatLabel}>{t('booksCollectionLabel')}</Text>
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStatItem}>
               <Text style={styles.heroStatNum}>{books.filter(b => b.file_url).length}</Text>
-              <Text style={styles.heroStatLabel}>Tersedia</Text>
+              <Text style={styles.heroStatLabel}>{t('booksAvailableLabel')}</Text>
             </View>
           </View>
         </View>
@@ -189,7 +191,7 @@ export default function BooksScreen() {
           <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Cari judul buku atau naskah..."
+            placeholder={t('booksSearch')}
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -205,7 +207,7 @@ export default function BooksScreen() {
       {loading ? (
         <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={colors.text} />
-          <Text style={styles.loadingText}>Memuat perpustakaan...</Text>
+          <Text style={styles.loadingText}>{t('booksLoading')}</Text>
         </View>
       ) : (
         <FlatList
@@ -225,7 +227,7 @@ export default function BooksScreen() {
             loadingMore ? (
               <View style={{ paddingVertical: 20, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={colors.textSecondary} />
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>Memuat lebih banyak...</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>{t('booksLoadingMore')}</Text>
               </View>
             ) : null
           }
@@ -234,8 +236,8 @@ export default function BooksScreen() {
               <View style={styles.emptyIconWrap}>
                 <Feather name="book-open" size={32} color="#cbd5e1" />
               </View>
-              <Text style={styles.emptyTitle}>Belum ada buku</Text>
-              <Text style={styles.emptyDesc}>Admin belum menambahkan buku ke perpustakaan.</Text>
+              <Text style={styles.emptyTitle}>{t('booksEmptyTitle')}</Text>
+              <Text style={styles.emptyDesc}>{t('booksEmptyDesc')}</Text>
             </View>
           }
         />
@@ -257,7 +259,7 @@ export default function BooksScreen() {
               />
               <View style={styles.modalInfo}>
                 <Text style={styles.modalTitle}>{selectedBook.title}</Text>
-                <Text style={styles.modalAuthor}>{selectedBook.author || 'Penulis tidak diketahui'}</Text>
+                <Text style={styles.modalAuthor}>{selectedBook.author || t('booksUnknownAuthor')}</Text>
                 <View style={styles.modalBadgeRow}>
                   <View style={styles.modalBadge}>
                     <Feather name="file-text" size={12} color={colors.primary} />
@@ -275,7 +277,7 @@ export default function BooksScreen() {
 
             {selectedBook.description ? (
               <View style={styles.modalDescSection}>
-                <Text style={styles.modalDescLabel}>Sinopsis</Text>
+                <Text style={styles.modalDescLabel}>{t('booksSynopsis')}</Text>
                 <Text style={styles.modalDescText}>{selectedBook.description}</Text>
               </View>
             ) : null}
@@ -287,13 +289,13 @@ export default function BooksScreen() {
                 disabled={!selectedBook.file_url}
               >
                 <Feather name="eye" size={18} color={colors.background} />
-                <Text style={styles.modalBtnText}>Baca / Buka</Text>
+                <Text style={styles.modalBtnText}>{t('booksReadBtn')}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.modalBtnOutline}
                 onPress={() => setSelectedBook(null)}
               >
-                <Text style={styles.modalBtnOutlineText}>Tutup</Text>
+                <Text style={styles.modalBtnOutlineText}>{t('booksCloseBtn')}</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>

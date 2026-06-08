@@ -20,11 +20,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageViewing from 'react-native-image-viewing';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, UrlTile } from 'react-native-maps';
 
 const { width, height } = Dimensions.get('window');
 
@@ -42,6 +45,9 @@ const FALLBACK_IMAGE3 = require('../../assets/images/pusaka_bahari_banner_177649
 export default function ArtifactDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const { t } = useLanguage();
+  const styles = getStyles(colors, isDark);
 
   const [artifact, setArtifact] = useState<any>(null);
   const [gallery, setGallery]     = useState<any[]>([]);
@@ -49,6 +55,7 @@ export default function ArtifactDetailScreen() {
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded]   = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   // Player State
   const [showPlayer, setShowPlayer] = useState(false);
@@ -147,6 +154,7 @@ export default function ArtifactDetailScreen() {
       .eq('id', id)
       .single();
     setArtifact(art);
+    checkIfSaved();
 
     if (art) {
       // Fetch gallery items for THIS specific artifact
@@ -170,6 +178,37 @@ export default function ArtifactDetailScreen() {
     setLoading(false);
   };
 
+  
+  const checkIfSaved = async () => {
+    try {
+      const saves = await AsyncStorage.getItem('user_saved_artifacts');
+      if (saves) {
+        const savedIds = JSON.parse(saves);
+        setIsSaved(savedIds.includes(id));
+      }
+    } catch (e) {}
+  };
+
+  const toggleSave = async () => {
+    try {
+      const savesStr = await AsyncStorage.getItem('user_saved_artifacts');
+      let savedIds = savesStr ? JSON.parse(savesStr) : [];
+      
+      if (isSaved) {
+        savedIds = savedIds.filter((item: string) => item !== id);
+      } else {
+        if (!savedIds.includes(id)) {
+          savedIds.push(id);
+        }
+      }
+      
+      await AsyncStorage.setItem('user_saved_artifacts', JSON.stringify(savedIds));
+      setIsSaved(!isSaved);
+    } catch (e) {
+      console.warn("Failed to toggle save", e);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchAll();
@@ -188,7 +227,7 @@ export default function ArtifactDetailScreen() {
       Alert.alert('Lokasi Belum Tersedia', 'Koordinat untuk artefak ini belum ditambahkan oleh admin.');
       return;
     }
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${artifact.latitude},${artifact.longitude}`;
+    const url = Platform.OS === 'ios' ? `maps:0,0?q=${artifact.latitude},${artifact.longitude}` : `geo:0,0?q=${artifact.latitude},${artifact.longitude}`;
     Linking.openURL(url);
   };
 
@@ -197,7 +236,7 @@ export default function ArtifactDetailScreen() {
       <View style={styles.loadingScreen}>
         <StatusBar barStyle="dark-content" />
         <ActivityIndicator size="large" color="#0f172a" />
-        <Text style={styles.loadingText}>Memuat data...</Text>
+        <Text style={styles.loadingText}>{t('artLoading')}</Text>
       </View>
     );
   }
@@ -206,15 +245,15 @@ export default function ArtifactDetailScreen() {
     return (
       <View style={styles.loadingScreen}>
         <Feather name="alert-circle" size={48} color="#cbd5e1" />
-        <Text style={styles.loadingText}>Data tidak ditemukan.</Text>
+        <Text style={styles.loadingText}>{t('artNotFound')}</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtnAlt}>
-          <Text style={{ color: '#0f172a', fontWeight: '700' }}>Kembali</Text>
+          <Text style={{ color: colors.text, fontWeight: '700' }}>{t('artBack')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const desc = artifact.description ?? 'Belum ada deskripsi untuk peninggalan bersejarah ini.';
+  const desc = artifact.description ?? t('artNoDesc');
   const shortDesc = desc.length > 180 ? desc.slice(0, 180) + '...' : desc;
   const typeIcon = (TYPE_ICON[artifact.type] ?? 'archive') as any;
 
@@ -345,17 +384,17 @@ export default function ArtifactDetailScreen() {
   const formattedImages = galleryPhotos.map(photo => ({ uri: photo.image_url }));
 
   // Real-time Operational Hours logic
-  let openStatusText = artifact.operational_hours || "Tersedia di Tempat Penyimpanan / Museum";
+  let openStatusText = artifact.operational_hours || t('artOpenStatus');
   let statusColor = "#f59e0b"; // Orange (default for objects/books)
   let isOpenNow: boolean | null = null;
   
   if (!artifact.operational_hours) {
     if (artifact.type === 'Monumen' || artifact.type === 'Situs') {
-      openStatusText = "Terbuka 24 Jam (Area Publik)";
+      openStatusText = t('artOpen24H');
       statusColor = "#22c55e"; // Green
       isOpenNow = true;
     } else if (artifact.type === 'Bangunan') {
-      openStatusText = "Buka Mengikuti Jadwal Operasional";
+      openStatusText = t('artOpenSchedule');
       statusColor = "#8B5E3C"; // Brown
     }
   } else {
@@ -438,8 +477,8 @@ export default function ArtifactDetailScreen() {
               <TouchableOpacity style={styles.floatBtn} onPress={handleShare}>
                 <Feather name="share-2" size={20} color="#0f172a" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.floatBtn}>
-                <Feather name="bookmark" size={20} color="#0f172a" />
+              <TouchableOpacity style={styles.floatBtn} onPress={toggleSave}>
+                <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={isSaved ? "#fbbf24" : "#0f172a"} />
               </TouchableOpacity>
             </View>
           </SafeAreaView>
@@ -497,7 +536,7 @@ export default function ArtifactDetailScreen() {
 
           {/* Description */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Deskripsi</Text>
+            <Text style={styles.sectionTitle}>{t('artDescTitle')}</Text>
             <Text style={styles.descText}>
               {expanded ? desc : shortDesc}
             </Text>
@@ -510,12 +549,12 @@ export default function ArtifactDetailScreen() {
 
           {/* Attributes */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Informasi</Text>
+            <Text style={styles.sectionTitle}>{t('artInfoTitle')}</Text>
             <View style={styles.attributeGrid}>
-              <AttributeItem icon="archive" label="Tipe" value={artifact.type} />
-              <AttributeItem icon="calendar" label="Tahun" value={artifact.year ?? 'Tidak diketahui'} />
-              <AttributeItem icon="user" label="Penulis" value="Raja Ali Haji" />
-              <AttributeItem icon="map" label="Lokasi" value={artifact.latitude ? 'Koordinat Tersedia' : 'Belum ditandai'} />
+              <AttributeItem icon="archive" label={t('artType')} value={artifact.type} styles={styles} colors={colors} />
+              <AttributeItem icon="calendar" label={t('artYear')} value={artifact.year ?? t('artUnknownYear')} styles={styles} colors={colors} />
+              <AttributeItem icon="user" label={t('artAuthor')} value="Raja Ali Haji" styles={styles} colors={colors} />
+              <AttributeItem icon="map" label={t('artLocation')} value={artifact.latitude ? t('artCoordsAvailable') : t('artLocationNotMarked')} styles={styles} colors={colors} />
             </View>
           </View>
 
@@ -548,7 +587,7 @@ export default function ArtifactDetailScreen() {
           {/* Map Location */}
           {artifact.latitude && artifact.longitude && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Peta Lokasi</Text>
+              <Text style={styles.sectionTitle}>{t('artMapSection')}</Text>
               <View style={styles.mapContainer}>
                 <MapView
                   style={styles.map}
@@ -560,7 +599,16 @@ export default function ArtifactDetailScreen() {
                   }}
                   scrollEnabled={false}
                   zoomEnabled={false}
+                  mapType={Platform.OS == "android" ? "none" : "standard"}
+                  userInterfaceStyle={isDark ? "dark" : "light"}
                 >
+                  {Platform.OS === 'android' && (
+                    <UrlTile
+                      urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+                      maximumZ={19}
+                      flipY={false}
+                    />
+                  )}
                   <Marker
                     coordinate={{
                       latitude: Number(artifact.latitude),
@@ -570,7 +618,7 @@ export default function ArtifactDetailScreen() {
                   />
                 </MapView>
                 <TouchableOpacity style={styles.mapOverlayButton} onPress={openMaps} activeOpacity={0.8}>
-                  <Text style={styles.mapOverlayText}>Buka di Maps</Text>
+                  <Text style={styles.mapOverlayText}>{t('artOpenMap')}</Text>
                   <Feather name="external-link" size={14} color="#0f172a" style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
               </View>
@@ -581,8 +629,8 @@ export default function ArtifactDetailScreen() {
           {galleryPhotos.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Galeri Foto</Text>
-                <Text style={styles.seeAll}>{galleryPhotos.length} foto</Text>
+                <Text style={styles.sectionTitle}>{t('artPhotoGallery')}</Text>
+                <Text style={styles.seeAll}>{t('artPhotos').replace('{count}', galleryPhotos.length.toString())}</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 4 }}>
                 {galleryPhotos.map((item, index) => (
@@ -633,7 +681,7 @@ export default function ArtifactDetailScreen() {
           {/* Related Artifacts */}
           {related.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Peninggalan Serupa</Text>
+              <Text style={styles.sectionTitle}>{t('artRelated')}</Text>
               <View style={styles.relatedGrid}>
                 {related.map((item) => (
                   <TouchableOpacity
@@ -745,7 +793,7 @@ export default function ArtifactDetailScreen() {
               </View>
 
               <View style={{ marginTop: 16 }}>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>{t('artDescTitle')}</Text>
                 <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
                   {galleryPhotos[currentImageIndex]?.description || artifact?.description || 'Tidak ada deskripsi.'}
                 </Text>
@@ -910,7 +958,7 @@ export default function ArtifactDetailScreen() {
                           style={{ backgroundColor: '#f59e0b', paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
                           onPress={fetchAiExplanation}
                         >
-                          <Text style={{ color: '#0f172a', fontWeight: 'bold', fontSize: 15 }}>✨ Bedah Makna Lirik</Text>
+                          <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 15 }}>✨ Bedah Makna Lirik</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -972,11 +1020,11 @@ export default function ArtifactDetailScreen() {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
-function AttributeItem({ icon, label, value }: { icon: any; label: string; value: string }) {
+function AttributeItem({ icon, label, value, styles, colors }: { icon: any; label: string; value: string; styles: any; colors: any }) {
   return (
     <View style={styles.attributeItem}>
       <View style={styles.attributeIconWrap}>
-        <Feather name={icon} size={18} color="#0f172a" />
+        <Feather name={icon} size={18} color={colors.text} />
       </View>
       <Text style={styles.attributeLabel}>{label}</Text>
       <Text style={styles.attributeValue}>{value}</Text>
@@ -985,11 +1033,11 @@ function AttributeItem({ icon, label, value }: { icon: any; label: string; value
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#f8fafc' },
-  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: '#f8fafc' },
-  loadingText:  { fontSize: 15, color: '#94a3b8', fontWeight: '500' },
-  backBtnAlt:   { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: '#f1f5f9' },
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
+  container:    { flex: 1, backgroundColor: colors.backgroundSecondary },
+  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: colors.backgroundSecondary },
+  loadingText:  { fontSize: 15, color: colors.textSecondary, fontWeight: '500' },
+  backBtnAlt:   { marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: colors.border },
 
   // Hero
   heroContainer: { width, height: height * 0.38, position: 'relative' },
@@ -1001,60 +1049,60 @@ const styles = StyleSheet.create({
   floatRight:    { flexDirection: 'row', gap: 10 },
 
   // Card
-  card: { backgroundColor: '#ffffff', borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, paddingHorizontal: 22, paddingTop: 24, minHeight: height * 0.7 },
+  card: { backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, paddingHorizontal: 22, paddingTop: 24, minHeight: height * 0.7 },
 
   titleRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 10 },
-  artifactName:{ fontSize: 22, fontWeight: '800', color: '#0f172a', flex: 1, lineHeight: 28, letterSpacing: -0.5 },
+  artifactName:{ fontSize: 22, fontWeight: '800', color: colors.text, flex: 1, lineHeight: 28, letterSpacing: -0.5 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  locationText:{ fontSize: 13, color: '#64748b', fontWeight: '500' },
-  typeBadge:   { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
-  typeBadgeText:{ fontSize: 12, fontWeight: '700', color: '#0f172a' },
+  locationText:{ fontSize: 13, color: colors.textSecondary, fontWeight: '500' },
+  typeBadge:   { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  typeBadgeText:{ fontSize: 12, fontWeight: '700', color: colors.text },
 
   metaRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   ratingChip:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  ratingVal:   { fontSize: 14, fontWeight: '700', color: '#0f172a' },
-  ratingCount: { fontSize: 13, color: '#94a3b8' },
-  yearChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  yearText:    { fontSize: 12, fontWeight: '600', color: '#475569' },
+  ratingVal:   { fontSize: 14, fontWeight: '700', color: colors.text },
+  ratingCount: { fontSize: 13, color: colors.textSecondary },
+  yearChip:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.border, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  yearText:    { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
 
-  divider:     { height: 1, backgroundColor: '#f1f5f9', marginVertical: 14 },
+  divider:     { height: 1, backgroundColor: colors.border, marginVertical: 14 },
 
   // Modern Premium Actions
   modernActionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   primaryAction:   { flex: 1, backgroundColor: '#0f172a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16, gap: 8 },
   primaryActionText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
   secondaryActions: { flexDirection: 'row', gap: 10 },
-  secondaryBtn:    { width: 54, height: 54, backgroundColor: '#f1f5f9', borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  secondaryBtn:    { width: 54, height: 54, backgroundColor: colors.border, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 
   // Open Status
   openStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   openDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' },
-  openText:      { flex: 1, fontSize: 13, color: '#0f172a', fontWeight: '600' },
+  openText:      { flex: 1, fontSize: 13, color: colors.text, fontWeight: '600' },
 
   // Section
   section:         { marginBottom: 20 },
-  sectionTitle:    { fontSize: 17, fontWeight: '800', color: '#0f172a', marginBottom: 12, letterSpacing: -0.3 },
+  sectionTitle:    { fontSize: 17, fontWeight: '800', color: colors.text, marginBottom: 12, letterSpacing: -0.3 },
   sectionHeaderRow:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  seeAll:          { fontSize: 13, fontWeight: '600', color: '#0f172a', textDecorationLine: 'underline' },
-  descText:        { fontSize: 14, color: '#475569', lineHeight: 22 },
-  readMore:        { fontSize: 13, fontWeight: '700', color: '#0f172a', marginTop: 6 },
+  seeAll:          { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
+  descText:        { fontSize: 14, color: colors.textSecondary, lineHeight: 22 },
+  readMore:        { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 6 },
 
   // Attributes
   attributeGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  attributeItem:   { width: (width - 64) / 2, backgroundColor: '#f8fafc', borderRadius: 14, padding: 14, gap: 6, borderWidth: 1, borderColor: '#f1f5f9' },
-  attributeIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
-  attributeLabel:  { fontSize: 11, color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase' },
-  attributeValue:  { fontSize: 14, fontWeight: '700', color: '#0f172a' },
+  attributeItem:   { width: (width - 64) / 2, backgroundColor: colors.backgroundSecondary, borderRadius: 14, padding: 14, gap: 6, borderWidth: 1, borderColor: colors.border },
+  attributeIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  attributeLabel:  { fontSize: 11, color: colors.textSecondary, fontWeight: '600', textTransform: 'uppercase' },
+  attributeValue:  { fontSize: 14, fontWeight: '700', color: colors.text },
 
   // Map
   mapContainer: {
     height: 180,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
     position: 'relative',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
   },
   map: {
     width: '100%',
@@ -1079,7 +1127,7 @@ const styles = StyleSheet.create({
   mapOverlayText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.text,
   },
 
   // Gallery
@@ -1089,7 +1137,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
   },
   galleryCardImg: {
     width: '100%',
@@ -1120,24 +1168,24 @@ const styles = StyleSheet.create({
   },
 
   // Audio Player
-  audioCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f1f5f9' },
+  audioCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundSecondary, borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   audioCardImg:    { width: 48, height: 48, borderRadius: 10 },
   audioCardInfo:   { flex: 1, paddingHorizontal: 12 },
-  audioCardTitle:  { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 2 },
-  audioCardSub:    { fontSize: 12, color: '#94a3b8' },
-  audioPlayBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
+  audioCardTitle:  { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 2 },
+  audioCardSub:    { fontSize: 12, color: colors.textSecondary },
+  audioPlayBtn:    { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' },
 
   // Empty Gallery
-  emptyGallery:    { alignItems: 'center', padding: 28, gap: 8, backgroundColor: '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: '#f1f5f9' },
-  emptyGalleryText:{ fontSize: 13, color: '#94a3b8', fontWeight: '500', textAlign: 'center' },
+  emptyGallery:    { alignItems: 'center', padding: 28, gap: 8, backgroundColor: colors.backgroundSecondary, borderRadius: 14, borderWidth: 1, borderColor: colors.border },
+  emptyGalleryText:{ fontSize: 13, color: colors.textSecondary, fontWeight: '500', textAlign: 'center' },
 
   // Related
   relatedGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  relatedCard:     { width: (width - 54) / 2, borderRadius: 14, overflow: 'hidden', backgroundColor: '#f8fafc' },
+  relatedCard:     { width: (width - 54) / 2, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.backgroundSecondary },
   relatedImage:    { width: '100%', height: 100 },
   relatedInfo:     { padding: 10 },
-  relatedName:     { fontSize: 13, fontWeight: '700', color: '#0f172a' },
-  relatedYear:     { fontSize: 11, color: '#94a3b8', marginTop: 3 },
+  relatedName:     { fontSize: 13, fontWeight: '700', color: colors.text },
+  relatedYear:     { fontSize: 11, color: colors.textSecondary, marginTop: 3 },
 
   // Image Viewer
   imageViewerFooter: { padding: 24, paddingBottom: 48, backgroundColor: 'rgba(0,0,0,0.4)' },
@@ -1214,7 +1262,7 @@ const styles = StyleSheet.create({
   audioCardPlaylist: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   audioThumb: { width: 60, height: 60, borderRadius: 8 },
   audioInfo: { flex: 1, paddingHorizontal: 16 },
-  audioTitleText: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 4 },
-  audioDescText: { fontSize: 14, color: '#64748b', lineHeight: 20 },
-  playBtnSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
+  audioTitleText: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 },
+  audioDescText: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  playBtnSmall: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.backgroundSecondary, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
 });

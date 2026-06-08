@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import MapView, { Marker, MapPressEvent, UrlTile } from 'react-native-maps';
@@ -46,6 +47,7 @@ const TYPE_OPTIONS = ['Artefak', 'Naskah', 'Monumen', 'Benda'];
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdminPanel() {
   const { mode, isDark, colors } = useTheme();
+  const { t } = useLanguage();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -927,7 +929,7 @@ export default function AdminPanel() {
                     style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.border, alignItems: 'center' }} 
                     onPress={() => setEditingGalleryItem(null)}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary }}>Batal</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary }}>{t('adminCancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
@@ -1005,7 +1007,7 @@ export default function AdminPanel() {
                     onPress={() => setPendingGalleryItem(null)}
                     disabled={uploadingGalleryItem}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary }}>Batal</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary }}>{t('adminCancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }} 
@@ -1332,7 +1334,7 @@ export default function AdminPanel() {
             <Feather name="arrow-left" size={22} color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1, marginHorizontal: 12 }}>
-            <Text style={styles.headerTitle}>Panel Admin</Text>
+            <Text style={styles.headerTitle}>{t('adminPanel')}</Text>
             <Text style={styles.headerSub} numberOfLines={1}>{user?.email}</Text>
           </View>
           <TouchableOpacity
@@ -1475,7 +1477,7 @@ export default function AdminPanel() {
             {/* Modal Footer */}
             <View style={styles.modalFooter}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => { setModalVisible(false); resetForm(); }}>
-                <Text style={styles.cancelText}>Batal</Text>
+                <Text style={styles.cancelText}>{t('adminCancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.saveBtn, saving && styles.saveBtnOff]}

@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -77,6 +78,7 @@ const PAGE_SIZE = 20;
 
 export default function CatalogScreen() {
   const { mode, isDark, colors } = useTheme();
+  const { t } = useLanguage();
   const styles = getStyles(colors, isDark);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
@@ -202,9 +204,9 @@ export default function CatalogScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Katalog & Ensiklopedia</Text>
+        <Text style={styles.headerTitle}>{t('catalogHeader')}</Text>
         <Text style={styles.headerDesc}>
-          Jelajahi museum virtual peninggalan pusaka dan tradisi bahari Nusantara.
+          {t('catalogDesc')}
         </Text>
       </View>
 
@@ -214,7 +216,7 @@ export default function CatalogScreen() {
           <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Cari keris, perahu, monumen..."
+            placeholder={t('catalogSearch')}
             placeholderTextColor={colors.textSecondary}
             value={searchTerm}
             onChangeText={setSearchTerm}
@@ -256,7 +258,7 @@ export default function CatalogScreen() {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.text} />
-            <Text style={styles.loadingText}>Menyusun Katalog...</Text>
+            <Text style={styles.loadingText}>{t('catalogLoading')}</Text>
           </View>
         ) : activeCategory === 'Kamus Istilah' ? (
           <FlatList
@@ -269,7 +271,7 @@ export default function CatalogScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Feather name="search" size={48} color="#e2e8f0" style={{ marginBottom: 16 }} />
-                <Text style={styles.emptyText}>Istilah tidak ditemukan di kamus.</Text>
+                <Text style={styles.emptyText}>{t('catalogKamusEmpty')}</Text>
               </View>
             }
           />
@@ -299,7 +301,7 @@ export default function CatalogScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Feather name="inbox" size={48} color="#e2e8f0" style={{ marginBottom: 16 }} />
-                <Text style={styles.emptyText}>Tidak ada peninggalan yang cocok.</Text>
+                <Text style={styles.emptyText}>{t('catalogEmpty')}</Text>
               </View>
             }
           />
@@ -335,17 +337,17 @@ export default function CatalogScreen() {
               <View style={styles.metaRow}>
                 <View style={styles.metaBox}>
                   <Feather name="calendar" size={16} color={colors.textSecondary} style={{ marginBottom: 4 }} />
-                  <Text style={styles.metaLabel}>Tahun / Era</Text>
+                  <Text style={styles.metaLabel}>{t('catalogYearEra')}</Text>
                   <Text style={styles.metaValue}>{selectedItem.year}</Text>
                 </View>
                 <View style={styles.metaBox}>
                   <Feather name="map-pin" size={16} color={colors.textSecondary} style={{ marginBottom: 4 }} />
-                  <Text style={styles.metaLabel}>Lokasi Penyimpanan</Text>
-                  <Text style={styles.metaValue} numberOfLines={2}>{selectedItem.location || 'Museum Bahari / Koleksi Pribadi'}</Text>
+                  <Text style={styles.metaLabel}>{t('catalogLocation')}</Text>
+                  <Text style={styles.metaValue} numberOfLines={2}>{selectedItem.location || t('catalogDefaultLocation')}</Text>
                 </View>
               </View>
 
-              <Text style={styles.detailSectionTitle}>Sejarah & Deskripsi</Text>
+              <Text style={styles.detailSectionTitle}>{t('catalogHistoryDesc')}</Text>
               <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                 <Text style={styles.detailDescText}>{selectedItem.description}</Text>
                 <View style={{ height: 40 }} />
@@ -373,7 +375,7 @@ export default function CatalogScreen() {
                 onPress={() => setSelectedKamus(null)} 
                 style={{ width: '100%', paddingVertical: 14, backgroundColor: colors.text, borderRadius: 14, alignItems: 'center' }}
               >
-                <Text style={{ color: colors.card, fontWeight: '700', fontSize: 16 }}>Tutup</Text>
+                <Text style={{ color: colors.card, fontWeight: '700', fontSize: 16 }}>{t('catalogCloseModal')}</Text>
               </TouchableOpacity>
             </View>
           </View>

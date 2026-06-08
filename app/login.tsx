@@ -18,6 +18,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import * as Linking from 'expo-linking';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -31,6 +32,7 @@ export default function LoginScreen() {
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { login, register } = useAuth();
+  const { t } = useLanguage();
 
   const [activeTab, setActiveTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
@@ -57,7 +59,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setErrorMsg('Email dan kata sandi wajib diisi.');
+      setErrorMsg(t('loginErrEmailPass'));
       return;
     }
     setIsLoading(true);
@@ -73,15 +75,15 @@ export default function LoginScreen() {
 
   const handleRegister = async () => {
     if (!fullName || !email || !password || !confirmPassword) {
-      setErrorMsg('Semua kolom wajib diisi.');
+      setErrorMsg(t('loginErrAllField'));
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMsg('Kata sandi tidak cocok.');
+      setErrorMsg(t('loginErrMatch'));
       return;
     }
     if (password.length < 6) {
-      setErrorMsg('Kata sandi minimal 6 karakter.');
+      setErrorMsg(t('loginErrLength'));
       return;
     }
     setIsLoading(true);
@@ -92,8 +94,8 @@ export default function LoginScreen() {
       setErrorMsg(translateError(error));
     } else {
       Alert.alert(
-        'Pendaftaran Berhasil!',
-        'Akun berhasil dibuat. Silakan cek email Anda untuk konfirmasi, lalu masuk.',
+        t('loginRegSuccessTitle'),
+        t('loginRegSuccessDesc'),
         [{ text: 'OK', onPress: () => handleTabSwitch('login') }]
       );
     }
@@ -101,7 +103,7 @@ export default function LoginScreen() {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      setErrorMsg('Silakan masukkan alamat email Anda untuk mereset kata sandi.');
+      setErrorMsg(t('loginResetReq'));
       return;
     }
     setIsLoading(true);
@@ -120,8 +122,8 @@ export default function LoginScreen() {
       setErrorMsg(translateError(error.message));
     } else {
       Alert.alert(
-        'Email Terkirim',
-        'Tautan reset kata sandi telah dikirim. Silakan periksa email Anda.',
+        t('loginResetSentTitle'),
+        t('loginResetSentDesc'),
         [{ text: 'OK' }]
       );
     }
@@ -132,12 +134,12 @@ export default function LoginScreen() {
   };
 
   const translateError = (error: string): string => {
-    if (error.includes('Invalid login credentials')) return 'Email atau kata sandi salah.';
-    if (error.includes('Email not confirmed')) return 'Email belum dikonfirmasi. Cek kotak masuk Anda.';
-    if (error.includes('User already registered')) return 'Email ini sudah terdaftar. Silakan masuk.';
-    if (error.includes('Password should be')) return 'Kata sandi terlalu lemah.';
-    if (error.includes('Unable to validate email')) return 'Format email tidak valid.';
-    if (error.includes('User not found')) return 'Email tidak terdaftar di sistem kami.';
+    if (error.includes('Invalid login credentials')) return t('loginErrInvalidCred');
+    if (error.includes('Email not confirmed')) return t('loginErrNotConf');
+    if (error.includes('User already registered')) return t('loginErrAlreadyReg');
+    if (error.includes('Password should be')) return t('loginErrWeakPass');
+    if (error.includes('Unable to validate email')) return t('loginErrInvalidEmail');
+    if (error.includes('User not found')) return t('loginErrNotFound');
     return error;
   };
 
@@ -152,14 +154,10 @@ export default function LoginScreen() {
           {/* Cover Image */}
           <Animated.View entering={FadeIn.duration(800)} style={styles.imageWrap}>
             <Image
-              source={require('../assets/images/masjid_penyengat_1776493242751.jpg')}
+              source={require('../assets/images/Halamanlogin.webp')}
               style={styles.coverImage}
             />
             <View style={styles.imageOverlay} />
-            <View style={styles.imageTitle}>
-              <Feather name="anchor" size={20} color="#ffffff" />
-              <Text style={styles.imageTitleText}>RAHVerse</Text>
-            </View>
           </Animated.View>
 
           <View style={styles.formArea}>
@@ -170,25 +168,24 @@ export default function LoginScreen() {
                 style={[styles.tab, activeTab === 'login' && styles.tabActive]}
                 onPress={() => handleTabSwitch('login')}
               >
-                <Text style={[styles.tabText, activeTab === 'login' && styles.tabTextActive]}>Masuk</Text>
+                <Text style={[styles.tabText, activeTab === 'login' && styles.tabTextActive]}>{t('loginTabIn')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'register' && styles.tabActive]}
                 onPress={() => handleTabSwitch('register')}
               >
-                <Text style={[styles.tabText, activeTab === 'register' && styles.tabTextActive]}>Daftar</Text>
+                <Text style={[styles.tabText, activeTab === 'register' && styles.tabTextActive]}>{t('loginTabUp')}</Text>
               </TouchableOpacity>
             </Animated.View>
 
             {/* Title */}
             <Animated.View entering={FadeInDown.duration(500).delay(150)}>
               <Text style={styles.title}>
-                {activeTab === 'login' ? 'Selamat Kembali' : 'Buat Akun Baru'}
+                {activeTab === 'login' ? t('loginWelcome2') : t('loginJoin2')}
               </Text>
               <Text style={styles.subtitle}>
                 {activeTab === 'login'
-                  ? 'Masuk untuk mengakses koleksi naskah sejarah.'
-                  : 'Bergabunglah dan jelajahi warisan budaya Melayu.'}
+                  ? t('loginWelcomeSub2') : t('loginJoinSub2')}
               </Text>
             </Animated.View>
 
@@ -208,7 +205,7 @@ export default function LoginScreen() {
                   <Feather name="user" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Nama Lengkap"
+                    placeholder={t('loginFullName2')}
                     placeholderTextColor={colors.textSecondary}
                     value={fullName}
                     onChangeText={setFullName}
@@ -221,7 +218,7 @@ export default function LoginScreen() {
                 <Feather name="mail" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Alamat Surel (Email)"
+                  placeholder={t('loginEmail2')}
                   placeholderTextColor={colors.textSecondary}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -234,7 +231,7 @@ export default function LoginScreen() {
                 <Feather name="lock" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Kata Sandi"
+                  placeholder={t('loginPass2')}
                   placeholderTextColor={colors.textSecondary}
                   secureTextEntry={!showPass}
                   value={password}
@@ -250,7 +247,7 @@ export default function LoginScreen() {
                   <Feather name="lock" size={20} color={colors.textSecondary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Konfirmasi Kata Sandi"
+                    placeholder={t('loginConfirmPass2')}
                     placeholderTextColor={colors.textSecondary}
                     secureTextEntry={!showPass}
                     value={confirmPassword}
@@ -261,7 +258,7 @@ export default function LoginScreen() {
 
               {activeTab === 'login' && (
                 <TouchableOpacity style={styles.forgotBtn} onPress={handleForgotPassword}>
-                  <Text style={styles.forgotText}>Lupa kata sandi?</Text>
+                  <Text style={styles.forgotText}>{t('loginForgot')}</Text>
                 </TouchableOpacity>
               )}
             </Animated.View>
@@ -278,7 +275,7 @@ export default function LoginScreen() {
                   <ActivityIndicator color={colors.background} />
                 ) : (
                   <Text style={styles.primaryBtnText}>
-                    {activeTab === 'login' ? 'Masuk Akun' : 'Daftar Sekarang'}
+                    {activeTab === 'login' ? t('loginSubmitIn') : t('loginSubmitUp')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -288,11 +285,11 @@ export default function LoginScreen() {
             <Animated.View entering={FadeIn.duration(800).delay(400)}>
               <View style={styles.divider}>
                 <View style={styles.line} />
-                <Text style={styles.dividerText}>ATAU</Text>
+                <Text style={styles.dividerText}>{t('loginOr')}</Text>
                 <View style={styles.line} />
               </View>
               <TouchableOpacity style={styles.guestBtn} onPress={handleGuest}>
-                <Text style={styles.guestBtnText}>Lanjutkan sebagai Tamu</Text>
+                <Text style={styles.guestBtnText}>{t('loginGuest')}</Text>
                 <Feather name="arrow-right" size={16} color="#475569" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
             </Animated.View>
@@ -328,7 +325,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)', // Dipergelap sedikit agar elemen UI lebih menonjol
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },

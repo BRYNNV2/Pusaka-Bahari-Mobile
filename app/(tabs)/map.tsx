@@ -7,11 +7,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { width, height } = Dimensions.get('window');
 
 export default function MapScreen() {
   const { mode, isDark, colors } = useTheme();
+  const { t } = useLanguage();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const [activeSite, setActiveSite] = useState<any>(null);
@@ -100,9 +102,9 @@ export default function MapScreen() {
       <SafeAreaView edges={['top']} style={styles.headerContainer} pointerEvents="box-none">
         <Animated.View entering={FadeInDown.duration(600)} style={styles.headerCard}>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.headerTitle}>Jalur Tur Edukasi</Text>
+            <Text style={styles.headerTitle}>{t('mapTourPath')}</Text>
             <Text style={styles.headerDesc}>
-              {loading ? 'Memuat lokasi...' : `${markers.length} situs warisan ditemukan`}
+              {loading ? t('mapLoadingLocation') : t('mapSitesFound').replace('{count}', markers.length.toString())}
             </Text>
           </View>
           <TouchableOpacity style={styles.refreshBtn} onPress={fetchLocations}>
@@ -115,7 +117,7 @@ export default function MapScreen() {
       {loading && markers.length === 0 && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={colors.text} />
-          <Text style={styles.loadingText}>Memuat situs warisan...</Text>
+          <Text style={styles.loadingText}>{t('mapLoadingSites')}</Text>
         </View>
       )}
 
@@ -132,7 +134,7 @@ export default function MapScreen() {
                   </View>
                 )}
                 {activeSite.year && (
-                  <Text style={styles.yearText}>Tahun {activeSite.year}</Text>
+                  <Text style={styles.yearText}>{t('mapYear').replace('{year}', activeSite.year.toString())}</Text>
                 )}
               </View>
             </View>
@@ -145,18 +147,18 @@ export default function MapScreen() {
             style={styles.actionBtn}
             onPress={() => router.push(`/artifact/${activeSite.id}` as any)}
           >
-            <Text style={styles.actionBtnText}>Lihat Detail Lengkap</Text>
+            <Text style={styles.actionBtnText}>{t('mapViewDetail')}</Text>
             <Feather name="arrow-right" size={18} color="white" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
         </Animated.View>
       ) : !loading && (
         <Animated.View entering={FadeInUp.duration(600).delay(200)} style={styles.bottomInstructionCard}>
           <Feather name="navigation" size={20} color={colors.text} style={{ marginBottom: 12 }} />
-          <Text style={styles.instructionTitle}>Mulai Eksplorasi</Text>
+          <Text style={styles.instructionTitle}>{t('mapStartExploration')}</Text>
           <Text style={styles.instructionDesc}>
             {markers.length > 0
-              ? 'Ketuk salah satu titik di peta untuk melihat detail situs warisan.'
-              : 'Belum ada situs dengan koordinat. Tambahkan melalui Panel Admin.'}
+              ? t('mapTapPrompt')
+              : t('mapNoSites')}
           </Text>
         </Animated.View>
       )}

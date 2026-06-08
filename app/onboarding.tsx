@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,6 +47,8 @@ const SLIDES = [
 ];
 
 export default function OnboardingScreen() {
+  const { isDark, colors } = useTheme();
+  const styles = getStyles(colors, isDark);
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -91,19 +94,20 @@ export default function OnboardingScreen() {
             {/* Background Image */}
             <Image source={slide.image} style={styles.bgImage} resizeMode="cover" />
 
+            {/* Dark Overlay Mask (agar teks RAHVerse dan logo selalu kontras) */}
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+
             {/* Gradient overlay bottom */}
             <LinearGradient
-              colors={['transparent', 'rgba(8,14,26,0.55)', 'rgba(8,14,26,0.97)']}
-              locations={[0.3, 0.6, 1]}
+              colors={['transparent', isDark ? 'rgba(30,41,59,0.5)' : 'rgba(255,255,255,0.5)', colors.card]}
+              locations={[0.3, 0.7, 1]}
               style={StyleSheet.absoluteFillObject}
             />
 
             {/* Logo / Badge Floating */}
             <SafeAreaView edges={['top']} style={styles.topArea}>
-              <View style={styles.logoBadge}>
-                <Text style={styles.logoBadgeIcon}>{slide.badge}</Text>
-              </View>
-              <Text style={styles.appName}>PUSAKA BAHARI</Text>
+              <Image source={require('../assets/images/rahverse_logo.png')} style={styles.logoBadgeImg} />
+              <Text style={styles.appName}>RAHVERSE</Text>
             </SafeAreaView>
           </View>
         ))}
@@ -165,8 +169,8 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#080e1a' },
+const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
+  container:  { flex: 1, backgroundColor: colors.background },
 
   // Slide
   slide:      { width, height, position: 'relative' },
@@ -174,20 +178,18 @@ const styles = StyleSheet.create({
 
   // Top Logo
   topArea:    { alignItems: 'center', marginTop: 24, gap: 10 },
-  logoBadge:  {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
+  logoBadgeImg: {
+    width: 64, height: 64, borderRadius: 18,
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)',
   },
   logoBadgeIcon: { fontSize: 32 },
-  appName:    { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.7)', letterSpacing: 3 },
+  appName:    { fontSize: 13, fontWeight: '800', color: 'rgba(255,255,255,0.85)', letterSpacing: 3, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
 
   // Bottom Card
   bottomCard: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 32, borderTopRightRadius: 32,
     paddingHorizontal: 28, paddingTop: 28, paddingBottom: 40,
     minHeight: height * 0.42,
@@ -195,19 +197,19 @@ const styles = StyleSheet.create({
 
   // Dots
   dotsRow:   { flexDirection: 'row', gap: 6, marginBottom: 20 },
-  dot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#e2e8f0' },
-  dotActive: { width: 24, backgroundColor: '#0f172a' },
+  dot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
+  dotActive: { width: 24, backgroundColor: colors.primary },
 
   // Text
-  title:    { fontSize: 30, fontWeight: '800', color: '#0f172a', lineHeight: 36, letterSpacing: -0.8, marginBottom: 12 },
-  subtitle: { fontSize: 15, color: '#64748b', lineHeight: 23, marginBottom: 32 },
+  title:    { fontSize: 30, fontWeight: '800', color: colors.text, lineHeight: 36, letterSpacing: -0.8, marginBottom: 12 },
+  subtitle: { fontSize: 15, color: colors.textSecondary, lineHeight: 23, marginBottom: 32 },
 
   // Buttons
   btnGroup:      { gap: 12 },
-  loginBtn:      { backgroundColor: '#0f172a', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  loginBtnText:  { color: '#ffffff', fontSize: 16, fontWeight: '700' },
-  guestBtn:      { height: 52, borderRadius: 16, borderWidth: 1.5, borderColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
-  guestBtnText:  { color: '#475569', fontSize: 15, fontWeight: '600' },
+  loginBtn:      { backgroundColor: colors.text, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  loginBtnText:  { color: colors.background, fontSize: 16, fontWeight: '700' },
+  guestBtn:      { height: 52, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  guestBtnText:  { color: colors.text, fontSize: 15, fontWeight: '600' },
   skipBtn:       { height: 48, alignItems: 'center', justifyContent: 'center' },
-  skipBtnText:   { color: '#94a3b8', fontSize: 14, fontWeight: '500' },
+  skipBtnText:   { color: colors.textSecondary, fontSize: 14, fontWeight: '500' },
 });

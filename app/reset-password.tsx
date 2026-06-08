@@ -3,10 +3,12 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -15,15 +17,15 @@ export default function ResetPasswordScreen() {
   // Fungsi untuk memperbarui kata sandi
   const handleUpdatePassword = async () => {
     if (!password || !confirmPassword) {
-      Alert.alert('Error', 'Semua kolom wajib diisi.');
+      Alert.alert('Error', t('resetErrEmpty'));
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Kata sandi tidak cocok.');
+      Alert.alert('Error', t('resetErrMatch'));
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Kata sandi minimal 6 karakter.');
+      Alert.alert('Error', t('resetErrLength'));
       return;
     }
 
@@ -36,11 +38,11 @@ export default function ResetPasswordScreen() {
     setIsLoading(false);
 
     if (error) {
-      Alert.alert('Gagal', error.message);
+      Alert.alert(t('resetFailTitle'), error.message);
     } else {
       Alert.alert(
-        'Berhasil!',
-        'Kata sandi Anda berhasil diperbarui. Silakan masuk dengan kata sandi baru.',
+        t('resetSuccessTitle'),
+        t('resetSuccessDesc'),
         [{ text: 'OK', onPress: () => router.replace('/login') }]
       );
     }
@@ -50,15 +52,15 @@ export default function ResetPasswordScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>Kata Sandi Baru</Text>
-          <Text style={styles.subtitle}>Silakan masukkan kata sandi baru untuk akun Anda.</Text>
+          <Text style={styles.title}>{t('resetTitle')}</Text>
+          <Text style={styles.subtitle}>{t('resetSub')}</Text>
         </View>
 
         <View style={styles.inputContainer}>
           <Feather name="lock" size={20} color="#94a3b8" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Kata sandi baru"
+            placeholder={t('resetNewPass')}
             placeholderTextColor="#94a3b8"
             secureTextEntry={!showPass}
             value={password}
@@ -73,7 +75,7 @@ export default function ResetPasswordScreen() {
           <Feather name="lock" size={20} color="#94a3b8" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Konfirmasi kata sandi"
+            placeholder={t('resetConfirmPass')}
             placeholderTextColor="#94a3b8"
             secureTextEntry={!showPass}
             value={confirmPassword}
@@ -89,7 +91,7 @@ export default function ResetPasswordScreen() {
           {isLoading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.primaryBtnText}>Simpan Kata Sandi</Text>
+            <Text style={styles.primaryBtnText}>{t('resetSaveBtn')}</Text>
           )}
         </TouchableOpacity>
       </View>

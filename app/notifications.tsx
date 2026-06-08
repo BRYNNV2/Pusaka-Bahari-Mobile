@@ -17,6 +17,7 @@ import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type NotifItem = {
   id: number;
@@ -36,6 +37,7 @@ const NOTIF_ICONS: Record<string, { name: string; lib: 'feather' | 'ionicons' | 
 
 export default function NotificationsScreen() {
   const { mode, isDark, colors } = useTheme();
+  const { t } = useLanguage();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { user } = useAuth();
@@ -73,9 +75,9 @@ export default function NotificationsScreen() {
 
   const clearAll = async () => {
     if (data.length === 0) return;
-    Alert.alert('Bersihkan Notifikasi', 'Hapus semua notifikasi ini dari layar Anda?', [
-      { text: 'Batal', style: 'cancel' },
-      { text: 'Ya, Bersihkan', onPress: async () => {
+    Alert.alert(t('notifClearAlertTitle'), t('notifClearAlertDesc'), [
+      { text: t('notifClearCancel'), style: 'cancel' },
+      { text: t('notifClearConfirm'), onPress: async () => {
         const uid = user?.id || 'guest';
         const allIdsToHide = [...hiddenIds, ...data.map(n => n.id)];
         setHiddenIds(allIdsToHide);
@@ -100,10 +102,10 @@ export default function NotificationsScreen() {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (minutes < 1) return 'Baru saja';
-    if (minutes < 60) return `${minutes} menit lalu`;
-    if (hours < 24) return `${hours} jam lalu`;
-    if (days < 7) return `${days} hari lalu`;
+    if (minutes < 1) return t('notifJustNow');
+    if (minutes < 60) return `${minutes} ${t('notifMinutesAgo')}`;
+    if (hours < 24) return `${hours} ${t('notifHoursAgo')}`;
+    if (days < 7) return `${days} ${t('notifDaysAgo')}`;
     return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
@@ -128,7 +130,7 @@ export default function NotificationsScreen() {
           <Text style={styles.cardTime}>{getTimeAgo(item.created_at)}</Text>
           <TouchableOpacity style={styles.delBtn} onPress={() => deleteNotif(item.id)}>
             <Feather name="x" size={14} color={colors.textSecondary} />
-            <Text style={styles.delBtnText}>Hapus</Text>
+            <Text style={styles.delBtnText}>{t('notifDelete')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -144,7 +146,7 @@ export default function NotificationsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Notifikasi</Text>
+          <Text style={styles.headerTitle}>{t('notifTitle')}</Text>
           <TouchableOpacity onPress={clearAll} style={styles.clearBtn}>
             <Feather name="trash-2" size={20} color={data.length > 0 ? colors.danger : colors.textSecondary} />
           </TouchableOpacity>
@@ -154,7 +156,7 @@ export default function NotificationsScreen() {
       {loading ? (
         <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={colors.text} />
-          <Text style={styles.loadingText}>Memuat notifikasi...</Text>
+          <Text style={styles.loadingText}>{t('notifLoading')}</Text>
         </View>
       ) : (
         <FlatList
@@ -168,8 +170,8 @@ export default function NotificationsScreen() {
               <View style={styles.emptyIconWrap}>
                 <Feather name="bell-off" size={32} color={colors.border} />
               </View>
-              <Text style={styles.emptyTitle}>Belum ada notifikasi</Text>
-              <Text style={styles.emptyDesc}>Semua pembaruan dari admin akan muncul di sini.</Text>
+              <Text style={styles.emptyTitle}>{t('notifEmptyTitle')}</Text>
+              <Text style={styles.emptyDesc}>{t('notifEmptyDesc')}</Text>
             </View>
           }
         />

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type AuthContextType = {
   isLoggedIn: boolean;
@@ -85,6 +86,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     setIsAdmin(false);
+    try {
+      await AsyncStorage.removeItem('agenda_popup_date');
+    } catch (e) {}
     await supabase.auth.signOut();
   };
 

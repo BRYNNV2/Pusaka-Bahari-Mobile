@@ -14,10 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useFocusEffect } from 'expo-router';
 import ImageViewing from 'react-native-image-viewing';
 import { Video, ResizeMode } from 'expo-av';
 import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_177649321571
 
 export default function GalleryScreen() {
   const { mode, isDark, colors } = useTheme();
+  const { t } = useLanguage();
   const styles = getStyles(colors, isDark);
   const [playlist, setPlaylist] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +54,59 @@ export default function GalleryScreen() {
   const [galleryPage, setGalleryPage] = useState(0);
   const [galleryHasMore, setGalleryHasMore] = useState(true);
   const [galleryLoadingMore, setGalleryLoadingMore] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    if (selectedPhoto) {
+      checkFavoriteLikeStatus(selectedPhoto.id);
+    }
+  }, [selectedPhoto]);
+
+    const checkFavoriteLikeStatus = async (id: string) => {
+    try {
+      const savedStr = await AsyncStorage.getItem('user_saves');
+      if (savedStr) {
+        const saved = JSON.parse(savedStr);
+        // Handle both old format (array of objects) and new format (array of strings)
+        setIsSaved(saved.some((item: any) => typeof item === 'string' ? item === id : item.id === id));
+      } else {
+        setIsSaved(false);
+      }
+      const likedStr = await AsyncStorage.getItem(`user_likes_${id}`);
+      setIsLiked(likedStr === 'true');
+    } catch (e) {}
+  };
+
+  const handleToggleSave = async () => {
+    if (!selectedPhoto) return;
+    try {
+      const savedStr = await AsyncStorage.getItem('user_saves');
+      let saved = savedStr ? JSON.parse(savedStr) : [];
+      
+      // Clean up old object format if any exists
+      saved = saved.map((item: any) => typeof item === 'string' ? item : item.id).filter(Boolean);
+
+      const exists = saved.includes(selectedPhoto.id);
+      if (exists) {
+        saved = saved.filter((id: string) => id !== selectedPhoto.id);
+        setIsSaved(false);
+      } else {
+        saved.push(selectedPhoto.id);
+        setIsSaved(true);
+      }
+      await AsyncStorage.setItem('user_saves', JSON.stringify(saved));
+    } catch (e) {}
+  };
+
+  const handleToggleLike = async () => {
+    if (!selectedPhoto) return;
+    try {
+      const newStatus = !isLiked;
+      setIsLiked(newStatus);
+      await AsyncStorage.setItem(`user_likes_${selectedPhoto.id}`, newStatus ? 'true' : 'false');
+    } catch (e) {}
+  };
   const [searchQuery, setSearchQuery] = useState('');
 
   const GALLERY_PAGE_SIZE = 15;
@@ -379,8 +435,8 @@ export default function GalleryScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Galeri & Media</Text>
-          <Text style={styles.headerDesc}>Dengarkan mahakarya & jelajahi koleksi foto pusaka.</Text>
+          <Text style={styles.headerTitle}>{t('galleryAndMedia')}</Text>
+          <Text style={styles.headerDesc}>{t('galleryDesc')}</Text>
         </View>
 
         
@@ -390,7 +446,7 @@ export default function GalleryScreen() {
             <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Cari foto, video, atau musik..."
+              placeholder={t('searchMedia')}
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -403,12 +459,12 @@ export default function GalleryScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Daftar Putar</Text>
+        <Text style={styles.sectionTitle}>{t('playlist')}</Text>
         <View style={styles.audioList}>
           {isLoading ? (
             <ActivityIndicator size="large" color={colors.text} style={{ marginVertical: 20 }} />
           ) : playlist.length === 0 ? (
-            <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>Belum ada audio yang diunggah.</Text>
+            <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>{t('noAudio')}</Text>
           ) : (
             playlist.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.desc.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
               <TouchableOpacity 
@@ -430,7 +486,7 @@ export default function GalleryScreen() {
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Galeri Visual</Text>
+        <Text style={styles.sectionTitle}>{t('visualGallery')}</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 16, paddingHorizontal: 20 }}>
           {artifactsData.length} koleksi foto & video artefak bersejarah
         </Text>
@@ -438,7 +494,7 @@ export default function GalleryScreen() {
         {artifactsData.length === 0 ? (
           <View style={{ padding: 30, alignItems: 'center' }}>
             <Feather name="image" size={40} color="#cbd5e1" style={{ marginBottom: 12 }} />
-            <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>Belum ada media visual.</Text>
+            <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>{t('noVisualMedia')}</Text>
           </View>
         ) : (
           <View style={{ paddingHorizontal: 16 }}>
@@ -469,9 +525,9 @@ export default function GalleryScreen() {
                     <View style={styles.exploreOverlay}>
                       <View style={[styles.exploreTypeBadge, item.video_url && { backgroundColor: 'rgba(239,68,68,0.7)', borderColor: 'rgba(239,68,68,0.5)' }]}>
                         <Feather name={item.video_url ? 'film' : 'image'} size={9} color={colors.background} style={{ marginRight: 4 }} />
-                        <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || 'Foto')}</Text>
+                        <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || t('photo'))}</Text>
                       </View>
-                      <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
+                      <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || t('untitled')}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -501,9 +557,9 @@ export default function GalleryScreen() {
                     <View style={styles.exploreOverlay}>
                       <View style={[styles.exploreTypeBadge, item.video_url && { backgroundColor: 'rgba(239,68,68,0.7)', borderColor: 'rgba(239,68,68,0.5)' }]}>
                         <Feather name={item.video_url ? 'film' : 'image'} size={9} color={colors.background} style={{ marginRight: 4 }} />
-                        <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || 'Foto')}</Text>
+                        <Text style={styles.exploreTypeText}>{item.video_url ? 'Video' : (item.artifacts?.type || t('photo'))}</Text>
                       </View>
-                      <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || 'Tanpa Judul'}</Text>
+                      <Text style={styles.exploreName} numberOfLines={1}>{item.title || item.artifacts?.name || t('untitled')}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -521,7 +577,7 @@ export default function GalleryScreen() {
                 ) : (
                   <>
                     <Feather name="plus-circle" size={16} color={colors.textSecondary} />
-                    <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 14 }}>Muat Lebih Banyak</Text>
+                    <Text style={{ color: colors.textSecondary, fontWeight: '600', fontSize: 14 }}>{t('loadMore')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -548,7 +604,7 @@ export default function GalleryScreen() {
                   >
                     <Feather name="chevron-left" size={22} color={'#ffffff'} />
                   </TouchableOpacity>
-                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', alignSelf: 'center' }}>Pemutar Video</Text>
+                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700', alignSelf: 'center' }}>{t('galVideoPlayer')}</Text>
                   <View style={{ width: 44 }} />
                 </View>
 
@@ -558,7 +614,7 @@ export default function GalleryScreen() {
                     <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }}>
                       <Feather name="youtube" size={48} color="#ef4444" style={{ marginBottom: 16 }} />
                       <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
-                        Video ini dari YouTube dan dibatasi untuk diputar di dalam aplikasi.
+                        {t('galYTAlert')}
                       </Text>
                       <TouchableOpacity 
                         style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ef4444', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24 }}
@@ -566,7 +622,7 @@ export default function GalleryScreen() {
                         activeOpacity={0.8}
                       >
                         <Feather name="external-link" size={16} color={'#ffffff'} style={{ marginRight: 8 }} />
-                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>Tonton di YouTube</Text>
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>{t('galWatchYT')}</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -588,11 +644,19 @@ export default function GalleryScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
-                        {selectedPhoto.title || selectedPhoto.artifacts?.name || 'Tanpa Judul'}
+                        {selectedPhoto.title || selectedPhoto.artifacts?.name || t('untitled')}
                       </Text>
                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
-                        Pulau Penyengat, Kepulauan Riau
+                        {selectedPhoto.artifacts?.location || 'Kepulauan Riau'}
                       </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 14, marginLeft: 10 }}>
+                      <TouchableOpacity onPress={handleToggleLike}>
+                        <Ionicons name={isLiked ? "heart" : "heart-outline"} size={26} color={isLiked ? "#ef4444" : "#ffffff"} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleToggleSave}>
+                        <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={isSaved ? "#fbbf24" : "#ffffff"} />
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -604,17 +668,19 @@ export default function GalleryScreen() {
                     <View style={styles.photoStatDivider} />
                     <View style={styles.photoStatItem}>
                       <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
-                      <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || 'Masa Kini'}</Text>
+                      <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || t('galPresentTime')}</Text>
                     </View>
                   </View>
 
                   <View style={{ marginTop: 20, marginBottom: 40 }}>
-                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
-                      {selectedPhoto.description || selectedPhoto.artifacts?.description || 'Tidak ada deskripsi untuk video ini.'}
-                    </Text>
-                  </View>
-                </ScrollView>
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>{t('galDescLbl')}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
+                        {selectedPhoto.description || selectedPhoto.artifacts?.description || t('galNoDescVideo')}
+                      </Text>
+                    </View>
+
+                    
+                  </ScrollView>
               </SafeAreaView>
             ) : (
               <>
@@ -651,14 +717,22 @@ export default function GalleryScreen() {
                         <Ionicons name="location" size={22} color={'#ffffff'} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
-                          {selectedPhoto.title || selectedPhoto.artifacts?.name || 'Tanpa Judul'}
-                        </Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
-                          Pulau Penyengat, Kepulauan Riau
-                        </Text>
-                      </View>
+                      <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: '800' }} numberOfLines={2}>
+                        {selectedPhoto.title || selectedPhoto.artifacts?.name || t('untitled')}
+                      </Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 }}>
+                        {selectedPhoto.artifacts?.location || 'Kepulauan Riau'}
+                      </Text>
                     </View>
+                    <View style={{ flexDirection: 'row', gap: 14, marginLeft: 10 }}>
+                      <TouchableOpacity onPress={handleToggleLike}>
+                        <Ionicons name={isLiked ? "heart" : "heart-outline"} size={26} color={isLiked ? "#ef4444" : "#ffffff"} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleToggleSave}>
+                        <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={isSaved ? "#fbbf24" : "#ffffff"} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
 
                     <View style={styles.photoStatsRow}>
                       <View style={styles.photoStatItem}>
@@ -668,7 +742,7 @@ export default function GalleryScreen() {
                       <View style={styles.photoStatDivider} />
                       <View style={styles.photoStatItem}>
                         <Feather name="calendar" size={14} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || 'Abad 19'}</Text>
+                        <Text style={styles.photoStatText}>{selectedPhoto.artifacts?.year || t('galPresentTime')}</Text>
                       </View>
                       <View style={styles.photoStatDivider} />
                       <View style={styles.photoStatItem}>
@@ -678,9 +752,9 @@ export default function GalleryScreen() {
                     </View>
 
                     <View style={{ marginTop: 16 }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Deskripsi</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>{t('galDescLbl')}</Text>
                       <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, lineHeight: 22 }}>
-                        {selectedPhoto.description || selectedPhoto.artifacts?.description || 'Tidak ada deskripsi untuk foto ini.'}
+                        {selectedPhoto.description || selectedPhoto.artifacts?.description || t('galNoDesc')}
                       </Text>
                     </View>
 
@@ -691,7 +765,7 @@ export default function GalleryScreen() {
                         activeOpacity={0.8}
                       >
                         <Feather name="zoom-in" size={16} color={'#ffffff'} />
-                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>Perbesar</Text>
+                        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 15 }}>{t('galZoomBtn')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         onPress={() => setSelectedPhoto(null)} 

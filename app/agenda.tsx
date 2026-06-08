@@ -15,6 +15,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Calendar from 'expo-calendar';
 import { Alert, Platform } from 'react-native';
@@ -31,6 +32,7 @@ type AgendaItem = {
 
 export default function AgendaScreen() {
   const { mode, isDark, colors } = useTheme();
+  const { t, language } = useLanguage();
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const [data, setData] = useState<AgendaItem[]>([]);
@@ -53,7 +55,7 @@ export default function AgendaScreen() {
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Tanggal belum ditentukan';
+    if (!dateString) return t('agendaNoDate');
     try {
       const date = new Date(dateString);
       const options: Intl.DateTimeFormatOptions = { 
@@ -62,7 +64,7 @@ export default function AgendaScreen() {
         month: 'long', 
         year: 'numeric' 
       };
-      return date.toLocaleDateString('id-ID', options);
+      return date.toLocaleDateString(language === 'en' ? 'en-US' : 'id-ID', options);
     } catch {
       return dateString;
     }
@@ -73,7 +75,7 @@ export default function AgendaScreen() {
     try {
       const date = new Date(dateString);
       const day = date.getDate().toString().padStart(2, '0');
-      const monthStr = date.toLocaleDateString('id-ID', { month: 'short' });
+      const monthStr = date.toLocaleDateString(language === 'en' ? 'en-US' : 'id-ID', { month: 'short' });
       return { day, month: monthStr };
     } catch {
       return { day: '-', month: '-' };
@@ -94,7 +96,7 @@ export default function AgendaScreen() {
 
         if (diff < 0) {
           setIsPast(true);
-          setTimeLeft('Acara Telah Berakhir');
+          setTimeLeft(t('agendaEnded'));
           return;
         }
 
@@ -104,9 +106,9 @@ export default function AgendaScreen() {
         const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
         if (days > 0) {
-          setTimeLeft(`${days} hari ${hours}j ${minutes}m ${seconds}d`);
+          setTimeLeft(t('agendaDaysLeft').replace('{days}', String(days)).replace('{hours}', String(hours)).replace('{minutes}', String(minutes)).replace('{seconds}', String(seconds)));
         } else {
-          setTimeLeft(`${hours}j ${minutes}m ${seconds}d`);
+          setTimeLeft(t('agendaHoursLeft').replace('{hours}', String(hours)).replace('{minutes}', String(minutes)).replace('{seconds}', String(seconds)));
         }
       };
 
@@ -140,16 +142,16 @@ export default function AgendaScreen() {
               timeZone: 'Asia/Jakarta',
               alarms: [{ relativeOffset: -60 }] // Ingatkan 1 jam sebelumnya
             });
-            Alert.alert('Sukses', 'Agenda berhasil ditambahkan ke kalender perangkat Anda!');
+            Alert.alert(t('success'), t('agendaAdded'));
           } else {
-            Alert.alert('Gagal', 'Tidak menemukan kalender default di perangkat Anda.');
+            Alert.alert(t('failed'), t('agendaNoCalendar'));
           }
         } else {
-          Alert.alert('Izin Ditolak', 'Aplikasi butuh izin untuk menyimpan acara ke kalender.');
+          Alert.alert(t('permissionDenied'), t('agendaPermission'));
         }
       } catch (error) {
         console.log('Error adding to calendar', error);
-        Alert.alert('Error', 'Terjadi kesalahan saat menambahkan agenda ke kalender.');
+        Alert.alert(t('error'), t('agendaErrorAdd'));
       }
     };
 
@@ -187,7 +189,7 @@ export default function AgendaScreen() {
             {!isPast && (
               <TouchableOpacity style={styles.actBtn} onPress={addToCalendar}>
                 <Feather name="calendar" size={14} color={colors.background} />
-                <Text style={styles.actBtnText}>Ingatkan</Text>
+                <Text style={styles.actBtnText}>{t('remindMe')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -205,22 +207,22 @@ export default function AgendaScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Agenda & Acara</Text>
+          <Text style={styles.headerTitle}>{t('agendaHeader')}</Text>
           <View style={{ width: 40 }} />
         </View>
       </SafeAreaView>
 
       <View style={styles.heroSection}>
-        <Text style={styles.heroTitle}>Jadwal Kebudayaan</Text>
+        <Text style={styles.heroTitle}>{t('agendaHeroTitle')}</Text>
         <Text style={styles.heroSub}>
-          Ikuti terus perkembangan festival, kajian, dan peringatan sejarah di RAHVerse.
+          {t('agendaHeroSub')}
         </Text>
       </View>
 
       {loading ? (
         <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={colors.text} />
-          <Text style={styles.loadingText}>Memuat jadwal agenda...</Text>
+          <Text style={styles.loadingText}>{t('agendaLoading')}</Text>
         </View>
       ) : (
         <FlatList
@@ -234,8 +236,8 @@ export default function AgendaScreen() {
               <View style={styles.emptyIconWrap}>
                 <Feather name="calendar" size={32} color="#cbd5e1" />
               </View>
-              <Text style={styles.emptyTitle}>Belum ada agenda</Text>
-              <Text style={styles.emptyDesc}>Saat ini tidak ada acara mendatang yang dijadwalkan.</Text>
+              <Text style={styles.emptyTitle}>{t('agendaEmptyTitle')}</Text>
+              <Text style={styles.emptyDesc}>{t('agendaEmptyDesc')}</Text>
             </View>
           }
         />

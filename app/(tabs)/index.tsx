@@ -5,6 +5,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { isLoggedIn, user, isAdmin } = useAuth();
+  const { t } = useLanguage();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Hero carousel
@@ -135,9 +137,17 @@ export default function HomeScreen() {
     
     setAgendaData(data || []);
 
-    // Tampilkan popup jika ada agenda terdekat dan belum ditampilkan di sesi ini
+    // Tampilkan popup jika ada agenda terdekat, dibatasi maksimal 1x sehari pakai AsyncStorage
     if (data && data.length > 0 && !hasShownAgendaModal.current) {
-      setShowAgendaModal(true);
+      try {
+        const lastShownDate = await AsyncStorage.getItem('agenda_popup_date');
+        if (lastShownDate !== today) {
+          setShowAgendaModal(true);
+          await AsyncStorage.setItem('agenda_popup_date', today);
+        }
+      } catch (e) {
+        setShowAgendaModal(true);
+      }
       hasShownAgendaModal.current = true;
     }
   };
@@ -182,14 +192,14 @@ export default function HomeScreen() {
               <Text style={styles.greetingTime}>
                 {(() => {
                   const hour = new Date().getHours();
-                  if (hour < 11) return 'Selamat Pagi 🌅';
-                  if (hour < 15) return 'Selamat Siang ☀️';
-                  if (hour < 18) return 'Selamat Sore 🌇';
-                  return 'Selamat Malam 🌙';
+                  if (hour < 11) return t('morning');
+                  if (hour < 15) return t('afternoon');
+                  if (hour < 18) return t('evening');
+                  return t('night');
                 })()}
               </Text>
               <Text style={styles.greetingName} numberOfLines={1}>
-                {isLoggedIn ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Pengguna') : 'Jelajahi Warisan Budaya'}
+                {isLoggedIn ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Pengguna') : t('exploreHeritage')}
               </Text>
             </View>
 
@@ -260,10 +270,10 @@ export default function HomeScreen() {
             <View style={styles.heroOverlay}>
               <View style={styles.heroBadge}>
                 <Ionicons name="compass" size={13} color={colors.background} />
-                <Text style={styles.heroBadgeText}>Jelajahi Sekarang</Text>
+                <Text style={styles.heroBadgeText}>{t('exploreNow')}</Text>
               </View>
-              <Text style={styles.heroTitle}>Temukan Warisan{"\n"}Raja Ali Haji</Text>
-              <Text style={styles.heroSubtitle}>Pusaka Pulau Penyengat, Kepulauan Riau</Text>
+              <Text style={styles.heroTitle}>{t('heroTitle')}</Text>
+              <Text style={styles.heroSubtitle}>{t('heroSubtitle')}</Text>
 
               {/* Dot Indicators */}
               <View style={styles.heroDots}>
@@ -305,7 +315,7 @@ export default function HomeScreen() {
             <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
             <TextInput 
               style={styles.searchInput}
-              placeholder="Cari naskah, artefak, atau sejarah..."
+              placeholder={t('searchPlaceholder')}
               placeholderTextColor="#94a3b8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -325,9 +335,9 @@ export default function HomeScreen() {
           {agendaData.length > 0 && (
             <View style={styles.agendaSectionWrapper}>
               <View style={styles.quickMenuHeaderRow}>
-                <Text style={styles.quickMenuTitle}>Agenda Mendatang</Text>
+                <Text style={styles.quickMenuTitle}>{t('upcomingEvents')}</Text>
                 <TouchableOpacity onPress={() => router.push('/agenda')}>
-                  <Text style={styles.quickMenuSeeAll}>Lihat Semua</Text>
+                  <Text style={styles.quickMenuSeeAll}>{t('seeAll')}</Text>
                 </TouchableOpacity>
               </View>
               
@@ -381,12 +391,12 @@ export default function HomeScreen() {
 
           {/* 5. Content Grid */}
           <View style={styles.contentSection}>
-            <Text style={styles.sectionTitle}>Eksplorasi Terdekat</Text>
+            <Text style={styles.sectionTitle}>{t('exploreNearby')}</Text>
 
             <View style={styles.gridContainer}>
               {loadingContent ? (
                 <View style={{ width: '100%', padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: colors.textSecondary }}>Memuat data sejarah...</Text>
+                  <Text style={{ color: colors.textSecondary }}>{t('loadingData')}</Text>
                 </View>
               ) : filteredArtifacts.length === 0 ? (
                 <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
@@ -394,7 +404,7 @@ export default function HomeScreen() {
                   <Text style={{ color: colors.textSecondary, fontWeight: '500', textAlign: 'center' }}>
                     {searchQuery 
                       ? `Tidak ada hasil untuk "${searchQuery}"` 
-                      : 'Belum ada data untuk kategori ini.'}
+                      : t('emptyData')}
                   </Text>
                 </View>
               ) : filteredArtifacts.map((item) => (
@@ -432,7 +442,7 @@ export default function HomeScreen() {
                     </View>
                     <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
                     <View style={styles.cardLocationRow}>
-                      <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+                      <Ionicons name="time-outline" size={12} color="rgba(255, 255, 255, 0.7)" />
                       <Text style={styles.cardLocationText} numberOfLines={1}>{item.year || 'Abad 19'}</Text>
                     </View>
                   </View>
@@ -1101,13 +1111,13 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   ratingText: {
-    color: colors.background,
+    color: '#ffffff',
     fontSize: 10,
     fontWeight: '700',
     marginLeft: 4,
   },
   cardTitle: {
-    color: colors.background,
+    color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 4,
@@ -1117,7 +1127,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     alignItems: 'center',
   },
   cardLocationText: {
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 11,
     marginLeft: 4,
     fontWeight: '500',
