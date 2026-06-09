@@ -6,6 +6,29 @@ import 'react-native-reanimated';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider as AppThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
+
+
+const toastConfig = {
+  success: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: '#fbbf24', backgroundColor: '#1e293b', marginTop: 40, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{ fontSize: 16, fontWeight: '700', color: '#ffffff' }}
+      text2Style={{ fontSize: 13, color: '#94a3b8' }}
+    />
+  ),
+  error: (props: any) => (
+    <ErrorToast
+      {...props}
+      style={{ borderLeftColor: '#ef4444', backgroundColor: '#1e293b', marginTop: 40, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{ fontSize: 16, fontWeight: '700', color: '#ffffff' }}
+      text2Style={{ fontSize: 13, color: '#94a3b8' }}
+    />
+  )
+};
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -54,6 +77,7 @@ function RootLayoutNav() {
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
+      <Toast config={toastConfig} />
     </ThemeProvider>
   );
 }

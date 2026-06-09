@@ -1,21 +1,24 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { 
-  Image, ScrollView, StatusBar, StyleSheet, Text, 
+import { ScrollView, StatusBar, StyleSheet, Text, 
   TouchableOpacity, View, Modal, Dimensions, Platform, ActivityIndicator,
-  RefreshControl, LayoutAnimation, UIManager, Alert, Linking, TextInput
+  RefreshControl, LayoutAnimation, UIManager, Alert, Linking, TextInput, Pressable
 } from 'react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Toast from 'react-native-toast-message';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useFocusEffect } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFocusEffect, useRouter } from 'expo-router';
 import ImageViewing from 'react-native-image-viewing';
 import { Video, ResizeMode } from 'expo-av';
 import { WebView } from 'react-native-webview';
@@ -27,6 +30,8 @@ const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_177649321571
 
 export default function GalleryScreen() {
   const { mode, isDark, colors } = useTheme();
+  const { isLoggedIn } = useAuth();
+  const router = useRouter();
   const { t } = useLanguage();
   const styles = getStyles(colors, isDark);
   const [playlist, setPlaylist] = useState<any[]>([]);
@@ -41,6 +46,8 @@ export default function GalleryScreen() {
   const [durationMillis, setDurationMillis] = useState(1);
   const [showPlayer, setShowPlayer] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [progressBarWidth, setProgressBarWidth] = useState(0);
+  const [shouldPlayNext, setShouldPlayNext] = useState(false);
   const [playerTab, setPlayerTab] = useState<'next' | 'lyrics' | 'related' | 'ai'>('lyrics');
 
   // AI State
@@ -69,7 +76,14 @@ export default function GalleryScreen() {
       if (savedStr) {
         const saved = JSON.parse(savedStr);
         // Handle both old format (array of objects) and new format (array of strings)
-        setIsSaved(saved.some((item: any) => typeof item === 'string' ? item === id : item.id === id));
+        const strIds = saved.map((item: any) => {
+          let s = String(typeof item === 'string' || typeof item === 'number' ? item : (item.id || item));
+          if (!s.includes('_')) s = 'legacy_' + s; // Normalize old IDs dynamically
+          return s;
+        });
+        let targetId = String(id);
+        if (!targetId.includes('_')) targetId = 'legacy_' + targetId;
+        setIsSaved(strIds.includes(targetId));
       } else {
         setIsSaved(false);
       }
@@ -80,30 +94,85 @@ export default function GalleryScreen() {
 
   const handleToggleSave = async () => {
     if (!selectedPhoto) return;
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Akses Ditolak', 
+        'Anda harus login untuk menyimpan koleksi ini.',
+        [
+          { text: 'Batal', style: 'cancel' },
+          { 
+            text: 'Login', 
+            onPress: async () => {
+              await import('@react-native-async-storage/async-storage').then(m => m.default.setItem('force_login_tab', 'true'));
+              router.push('/login');
+            }
+          }
+        ]
+      );
+      return;
+    }
     try {
       const savedStr = await AsyncStorage.getItem('user_saves');
-      let saved = savedStr ? JSON.parse(savedStr) : [];
+      let savedIds = savedStr ? JSON.parse(savedStr) : [];
       
-      // Clean up old object format if any exists
-      saved = saved.map((item: any) => typeof item === 'string' ? item : item.id).filter(Boolean);
-
-      const exists = saved.includes(selectedPhoto.id);
+      // Clean up and ensure string format
+      savedIds = savedIds.map((item: any) => {
+        let s = String(typeof item === 'string' || typeof item === 'number' ? item : (item.id || item));
+        if (!s.includes('_')) s = 'legacy_' + s; // Normalize old IDs dynamically
+        return s;
+      }).filter(Boolean);
+      let strId = String(selectedPhoto.id);
+      if (!strId.includes('_')) strId = 'legacy_' + strId;
+      
+      const exists = savedIds.includes(strId);
+      
       if (exists) {
-        saved = saved.filter((id: string) => id !== selectedPhoto.id);
+        savedIds = savedIds.filter((itemId: string) => itemId !== strId);
         setIsSaved(false);
       } else {
-        saved.push(selectedPhoto.id);
+        savedIds.push(strId);
         setIsSaved(true);
       }
-      await AsyncStorage.setItem('user_saves', JSON.stringify(saved));
+      
+      Haptics.notificationAsync(exists ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success);
+      Toast.show({
+        type: exists ? 'error' : 'success',
+        text1: exists ? t('removedFromFav') || 'Dihapus dari Koleksi' : t('addedToFav') || 'Disimpan ke Koleksi',
+        text2: exists ? 'Artefak dihapus dari koleksi Anda.' : 'Tersimpan aman di halaman Profil Anda.',
+        position: 'top',
+        visibilityTime: 3000,
+      });
+      await AsyncStorage.setItem('user_saves', JSON.stringify(savedIds));
     } catch (e) {}
   };
 
   const handleToggleLike = async () => {
     if (!selectedPhoto) return;
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Akses Ditolak', 
+        'Anda harus login untuk menyukai item ini.',
+        [
+          { text: 'Batal', style: 'cancel' },
+          { 
+            text: 'Login', 
+            onPress: async () => {
+              await import('@react-native-async-storage/async-storage').then(m => m.default.setItem('force_login_tab', 'true'));
+              router.push('/login');
+            }
+          }
+        ]
+      );
+      return;
+    }
     try {
       const newStatus = !isLiked;
       setIsLiked(newStatus);
+      if (newStatus) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
       await AsyncStorage.setItem(`user_likes_${selectedPhoto.id}`, newStatus ? 'true' : 'false');
     } catch (e) {}
   };
@@ -275,30 +344,47 @@ export default function GalleryScreen() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-  const playTrack = async (track: any) => {
-    if (sound) {
-      await sound.unloadAsync();
+  const playTrackIdRef = useRef<string | null>(null);
+
+  const playTrack = async (track: any, autoPlay: boolean = false) => {
+    const currentPlayId = Date.now().toString() + Math.random();
+    playTrackIdRef.current = currentPlayId;
+
+    if (soundRef.current) {
+      soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
       setSound(null);
     }
+    
     setActiveTrack(track);
     setShowPlayer(true);
     setPositionMillis(0);
-    setIsPlaying(false);
+    setIsPlaying(autoPlay);
     setAiExplanation(null);
     setAiLoading(false);
 
-    try {
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: track.audioUrl },
-        { shouldPlay: false },
-        onPlaybackStatusUpdate
-      );
-      setSound(newSound);
-      setIsPlaying(false);
-    } catch (e: any) {
-      console.log('Error playing audio', e);
-      Alert.alert('Error Audio', 'Tidak dapat memutar lagu ini. Pastikan koneksi internet stabil atau URL valid.\nDetail: ' + (e.message || 'Unknown error'));
-    }
+    setTimeout(async () => {
+      try {
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: track.audioUrl },
+          { shouldPlay: autoPlay, progressUpdateIntervalMillis: 500 },
+          onPlaybackStatusUpdate
+        );
+        
+        if (playTrackIdRef.current === currentPlayId) {
+          soundRef.current = newSound;
+          setSound(newSound);
+        } else {
+          newSound.unloadAsync().catch(() => {});
+        }
+      } catch (e: any) {
+        if (playTrackIdRef.current === currentPlayId) {
+          console.log('Error playing audio', e);
+          setIsPlaying(false);
+          Alert.alert('Error Audio', 'Tidak dapat memutar lagu ini. Pastikan koneksi internet stabil atau URL valid.\nDetail: ' + (e.message || 'Unknown error'));
+        }
+      }
+    }, 100);
   };
 
   const onPlaybackStatusUpdate = (status: any) => {
@@ -309,9 +395,50 @@ export default function GalleryScreen() {
       }
       if (status.didJustFinish) {
         setIsPlaying(false);
+        setShouldPlayNext(true);
       }
     }
   };
+
+  const skipToNext = (forcePlay?: boolean) => {
+    if (!activeTrack || playlist.length === 0) return;
+    const currentIndex = playlist.findIndex(p => p.id === activeTrack.id);
+    if (currentIndex >= 0 && currentIndex < playlist.length - 1) {
+      playTrack(playlist[currentIndex + 1], forcePlay !== undefined ? forcePlay : isPlaying);
+    }
+  };
+
+  const skipToPrev = (forcePlay?: boolean) => {
+    if (!activeTrack || playlist.length === 0) return;
+    const currentIndex = playlist.findIndex(p => p.id === activeTrack.id);
+    if (currentIndex > 0) {
+      playTrack(playlist[currentIndex - 1], forcePlay !== undefined ? forcePlay : isPlaying);
+    } else {
+      if (sound) {
+        sound.setPositionAsync(0);
+        if (forcePlay !== undefined ? forcePlay : isPlaying) {
+          sound.playAsync();
+          setIsPlaying(true);
+        }
+      }
+    }
+  };
+
+  const handleSeek = async (event: any) => {
+    if (!sound || durationMillis === 0 || progressBarWidth === 0) return;
+    const { locationX } = event.nativeEvent;
+    const percent = Math.max(0, Math.min(1, locationX / progressBarWidth));
+    const newPosition = percent * durationMillis;
+    await sound.setPositionAsync(newPosition);
+    setPositionMillis(newPosition);
+  };
+
+  useEffect(() => {
+    if (shouldPlayNext) {
+      setShouldPlayNext(false);
+      skipToNext(true);
+    }
+  }, [shouldPlayNext]);
 
   const togglePlayPause = async () => {
     if (!sound) return;
@@ -363,10 +490,9 @@ export default function GalleryScreen() {
   };
 
   useEffect(() => {
-    return sound ? () => { sound.unloadAsync(); } : undefined;
+    return sound ? () => { sound.unloadAsync().catch(() => {}); } : undefined;
   }, [sound]);
 
-  // Gunakan ref untuk state terbaru di cleanup useFocusEffect
   const soundRef = useRef<Audio.Sound | null>(null);
   const isPlayingRef = useRef<boolean>(false);
 
@@ -685,11 +811,7 @@ export default function GalleryScreen() {
             ) : (
               <>
                 {/* Mode Tampilan Khusus Gambar (Desain Lama) */}
-                <Image 
-                  source={{ uri: selectedPhoto.image_url }} 
-                  style={{ width, height, position: 'absolute' }} 
-                  resizeMode="cover"
-                />
+                <Image source={{ uri: selectedPhoto.image_url }} style={{ width, height, position: "absolute" }} contentFit="cover" transition={500} cachePolicy="memory-disk" />
 
                 {/* Top Buttons (Hanya untuk foto) */}
                 <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
@@ -779,8 +901,10 @@ export default function GalleryScreen() {
                 </View>
               </>
             )}
-          </View>
-        </Modal>
+          
+          <Toast />
+        </View>
+      </Modal>
       )}
  
 
@@ -826,9 +950,13 @@ export default function GalleryScreen() {
 
                 {/* Progress Bar */}
                 <View style={styles.progressContainer}>
-                  <View style={styles.progressBarBg}>
+                  <Pressable 
+                    style={styles.progressBarBg}
+                    onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}
+                    onPress={handleSeek}
+                  >
                     <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-                  </View>
+                  </Pressable>
                   <View style={styles.timeContainer}>
                     <Text style={styles.timeText}>{formatTime(positionMillis)}</Text>
                     <Text style={styles.timeText}>{formatTime(durationMillis)}</Text>
@@ -837,13 +965,13 @@ export default function GalleryScreen() {
 
                 {/* Controls */}
                 <View style={styles.controlsContainer}>
-                  <TouchableOpacity>
+                  <TouchableOpacity onPress={() => skipToPrev()}>
                     <Ionicons name="play-skip-back" size={32} color="white" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtnLarge}>
                     <Ionicons name={isPlaying ? "pause" : "play"} size={40} color={'#0f172a'} style={!isPlaying ? {marginLeft: 4} : {}} />
                   </TouchableOpacity>
-                  <TouchableOpacity>
+                  <TouchableOpacity onPress={() => skipToNext()}>
                     <Ionicons name="play-skip-forward" size={32} color="white" />
                   </TouchableOpacity>
                 </View>
@@ -964,7 +1092,7 @@ export default function GalleryScreen() {
                       <TouchableOpacity 
                         key={item.id} 
                         style={[styles.audioCard, { borderBottomColor: 'rgba(255,255,255,0.1)' }]} 
-                        onPress={() => { playTrack(item); setIsExpanded(false); }}
+                        onPress={() => { playTrack(item, true); setIsExpanded(false); }}
                       >
                         <Image source={item.img} style={styles.audioThumb} />
                         <View style={styles.audioInfo}>
@@ -987,11 +1115,11 @@ export default function GalleryScreen() {
                       <TouchableOpacity 
                         key={item.id} 
                         style={[styles.audioCard, { borderBottomColor: 'rgba(255,255,255,0.1)' }]} 
-                        onPress={() => { playTrack(item); setIsExpanded(false); }}
+                        onPress={() => { playTrack(item, true); setIsExpanded(false); }}
                       >
                         <Image source={item.img} style={styles.audioThumb} />
                         <View style={styles.audioInfo}>
-                          <Text style={[styles.audioTitle, { color: colors.card }]}>{item.title}</Text>
+                          <Text style={[styles.audioTitle, { color: '#ffffff' }]}>{item.title}</Text>
                           <Text style={[styles.audioDesc, { color: 'rgba(255,255,255,0.6)' }]}>{item.desc}</Text>
                         </View>
                       </TouchableOpacity>
@@ -1168,7 +1296,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   playerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: colors.card,
+    color: '#ffffff',
     marginBottom: 8,
   },
   playerDesc: {
@@ -1187,7 +1315,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     borderRadius: 2,
   },
   timeContainer: {
@@ -1210,7 +1338,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.card,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1233,7 +1361,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     marginBottom: 20,
   },
   lyricTextActive: {
-    color: colors.card,
+    color: '#ffffff',
     fontSize: 28,
     fontWeight: '800',
     opacity: 1,
@@ -1260,7 +1388,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   expandedTabActive: {
     borderBottomWidth: 3,
-    borderBottomColor: colors.card,
+    borderBottomColor: '#ffffff',
   },
   expandedTabText: {
     color: 'rgba(255,255,255,0.5)',
@@ -1268,7 +1396,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontWeight: '600',
   },
   expandedTabTextActive: {
-    color: colors.card,
+    color: '#ffffff',
     fontWeight: '700',
   },
   expandedContent: {
@@ -1334,12 +1462,12 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     alignItems: 'center',
   },
   exploreTypeText: {
-    color: colors.card,
+    color: '#ffffff',
     fontSize: 10,
     fontWeight: '700',
   },
   exploreName: {
-    color: colors.card,
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
   },

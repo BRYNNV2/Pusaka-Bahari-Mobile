@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar, Animated, Dimensions, Easing, RefreshControl, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, TextInput, Platform, StatusBar, Animated, Dimensions, Easing, RefreshControl, Modal, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -57,6 +57,8 @@ export default function HomeScreen() {
   const [loadingContent, setLoadingContent] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'a-z' | 'z-a'>('newest');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   const [agendaData, setAgendaData] = useState<any[]>([]);
   const [showAgendaModal, setShowAgendaModal] = useState(false);
@@ -109,17 +111,26 @@ export default function HomeScreen() {
       .then(({ data }) => setAvatarUrl(data?.avatar_url ?? null));
   }, [user]);
 
+  const handleFilterPress = () => {
+    setShowFilterDropdown(!showFilterDropdown);
+  };
+
   useEffect(() => {
     fetchArtifacts();
-  }, [activeCategory]);
+  }, [activeCategory, sortOrder]);
 
   const fetchArtifacts = async () => {
     setLoadingContent(true);
-    let query = supabase.from('artifacts').select('*').order('id', { ascending: false });
+    let query = supabase.from('artifacts').select('*');
     
     if (activeCategory !== 'Semua') {
       query = query.eq('type', activeCategory);
     }
+
+    if (sortOrder === 'newest') query = query.order('id', { ascending: false });
+    else if (sortOrder === 'oldest') query = query.order('id', { ascending: true });
+    else if (sortOrder === 'a-z') query = query.order('name', { ascending: true });
+    else if (sortOrder === 'z-a') query = query.order('name', { ascending: false });
     
     const { data } = await query;
     setArtifactsData(data || []);
@@ -204,14 +215,16 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.headerRightActions}>
-              <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
-                <Feather name="bell" size={20} color={colors.text} />
-                {unreadCount > 0 && (
-                  <View style={styles.bellBadge}>
-                    <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              {isLoggedIn && (
+                <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
+                  <Feather name="bell" size={20} color={colors.text} />
+                  {unreadCount > 0 && (
+                    <View style={styles.bellBadge}>
+                      <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
               
               <TouchableOpacity 
                 style={styles.avatarBtn} 
@@ -311,7 +324,7 @@ export default function HomeScreen() {
           </View>
 
           {/* 3. Search Bar */}
-          <View style={styles.searchContainer}>
+          <View style={[styles.searchContainer, { zIndex: 100, position: 'relative' }]}>
             <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
             <TextInput 
               style={styles.searchInput}
@@ -325,9 +338,30 @@ export default function HomeScreen() {
                 <Feather name="x" size={20} color={colors.danger} />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={styles.filterBtn}>
-                <Ionicons name="options-outline" size={20} color={colors.text} />
+              <TouchableOpacity style={styles.filterBtn} onPress={handleFilterPress}>
+                <Ionicons name="options-outline" size={20} color={sortOrder !== 'newest' ? colors.primary : colors.text} />
               </TouchableOpacity>
+            )}
+
+            {/* Dropdown Filter */}
+            {showFilterDropdown && (
+              <View style={styles.dropdownMenuInline}>
+                {(['newest', 'oldest', 'a-z', 'z-a'] as const).map(option => (
+                  <TouchableOpacity 
+                    key={option} 
+                    style={[styles.dropdownItem, sortOrder === option && styles.dropdownItemActive]}
+                    onPress={() => {
+                      setSortOrder(option);
+                      setShowFilterDropdown(false);
+                    }}
+                  >
+                    <Text style={[styles.dropdownItemText, sortOrder === option && styles.dropdownItemTextActive]}>
+                      {option === 'newest' ? 'Terbaru' : option === 'oldest' ? 'Terlama' : option === 'a-z' ? 'Abjad (A-Z)' : 'Abjad (Z-A)'}
+                    </Text>
+                    {sortOrder === option && <Feather name="check" size={16} color={colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
           </View>
 
@@ -393,10 +427,10 @@ export default function HomeScreen() {
           <View style={styles.contentSection}>
             <Text style={styles.sectionTitle}>{t('exploreNearby')}</Text>
 
-            <View style={styles.gridContainer}>
-              {loadingContent ? (
-                <View style={{ width: '100%', padding: 20, alignItems: 'center' }}>
-                  <Text style={{ color: colors.textSecondary }}>{t('loadingData')}</Text>
+            <View style={[styles.gridContainer, { opacity: loadingContent ? 0.6 : 1 }]}>
+              {loadingContent && filteredArtifacts.length === 0 ? (
+                <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={colors.primary} />
                 </View>
               ) : filteredArtifacts.length === 0 ? (
                 <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
@@ -721,6 +755,44 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     color: colors.text,
     fontWeight: '500',
     height: '100%',
+  },
+  dropdownMenuInline: {
+    position: 'absolute',
+    top: 60, // tepat di bawah search container
+    right: 0,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    width: 220,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 15,
+    zIndex: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 8,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 2,
+  },
+  dropdownItemActive: {
+    backgroundColor: colors.backgroundSecondary,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  dropdownItemTextActive: {
+    color: colors.primary,
+    fontWeight: '800',
   },
   emptyText: {
     fontSize: 14,

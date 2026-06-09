@@ -11,6 +11,7 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   register: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 };
 
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   login: async () => ({ error: null }),
   register: async () => ({ error: null }),
+  resetPassword: async () => ({ error: null }),
   logout: async () => {},
 });
 
@@ -84,6 +86,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error: null };
   };
 
+  const resetPassword = async (email: string): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'mobileproject://reset-password',
+      });
+      if (error) return { error: error.message };
+      return { error: null };
+    } catch (e: any) {
+      return { error: e.message || 'Terjadi kesalahan jaringan' };
+    }
+  };
+
   const logout = async () => {
     setIsAdmin(false);
     try {
@@ -102,6 +116,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loading,
         login,
         register,
+        resetPassword,
         logout,
       }}
     >

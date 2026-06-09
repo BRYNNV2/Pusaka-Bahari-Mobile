@@ -141,17 +141,7 @@ export default function OnboardingScreen() {
               activeOpacity={0.85}
               onPress={() => finishOnboarding()}
             >
-              <Text style={styles.loginBtnText}>Masuk Akun</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.guestBtn}
-              activeOpacity={0.75}
-              onPress={async () => {
-                await AsyncStorage.setItem('onboarding_seen', 'true');
-                router.replace('/(tabs)');
-              }}
-            >
-              <Text style={styles.guestBtnText}>Jelajahi sebagai Tamu</Text>
+              <Text style={styles.loginBtnText}>Lanjutkan</Text>
             </TouchableOpacity>
           </View>
         ) : (

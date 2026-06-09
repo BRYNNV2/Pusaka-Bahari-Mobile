@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
@@ -19,14 +18,26 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  useAnimatedScrollHandler, 
+  interpolate, 
+  Extrapolate 
+} from 'react-native-reanimated';
+
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageViewing from 'react-native-image-viewing';
+import * as Haptics from 'expo-haptics';
+import Toast from 'react-native-toast-message';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 
 const { width, height } = Dimensions.get('window');
@@ -47,6 +58,7 @@ export default function ArtifactDetailScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { isLoggedIn } = useAuth();
   const styles = getStyles(colors, isDark);
 
   const [artifact, setArtifact] = useState<any>(null);
@@ -124,6 +136,31 @@ export default function ArtifactDetailScreen() {
   };
 
   // Image Viewer State
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, 150],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    return { opacity };
+  });
+
+  const titleAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [100, 180],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    return { opacity };
+  });
+  
   const [isImageViewVisible, setIsImageViewVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [zoomImageUri, setZoomImageUri] = useState<string | null>(null);
@@ -181,29 +218,61 @@ export default function ArtifactDetailScreen() {
   
   const checkIfSaved = async () => {
     try {
-      const saves = await AsyncStorage.getItem('user_saved_artifacts');
-      if (saves) {
-        const savedIds = JSON.parse(saves);
-        setIsSaved(savedIds.includes(id));
+      const savesStr = await AsyncStorage.getItem('user_saved_artifacts');
+      if (savesStr) {
+        const savedIds = JSON.parse(savesStr);
+        const strIds = savedIds.map((item: any) => String(typeof item === 'string' || typeof item === 'number' ? item : item.id));
+        setIsSaved(strIds.includes(String(id)));
       }
     } catch (e) {}
   };
 
   const toggleSave = async () => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Akses Ditolak', 
+        'Anda harus login untuk menyimpan artefak ini.',
+        [
+          { text: 'Batal', style: 'cancel' },
+          { 
+            text: 'Login', 
+            onPress: async () => {
+              await import('@react-native-async-storage/async-storage').then(m => m.default.setItem('force_login_tab', 'true'));
+              router.push('/login');
+            }
+          }
+        ]
+      );
+      return;
+    }
     try {
       const savesStr = await AsyncStorage.getItem('user_saved_artifacts');
       let savedIds = savesStr ? JSON.parse(savesStr) : [];
       
-      if (isSaved) {
-        savedIds = savedIds.filter((item: string) => item !== id);
+      // Clean up and ensure string format
+      savedIds = savedIds.map((item: any) => String(typeof item === 'string' || typeof item === 'number' ? item : item.id)).filter(Boolean);
+      const strId = String(id);
+      
+      const exists = savedIds.includes(strId);
+      
+      if (exists) {
+        savedIds = savedIds.filter((itemId: string) => itemId !== strId);
+        setIsSaved(false);
       } else {
-        if (!savedIds.includes(id)) {
-          savedIds.push(id);
-        }
+        savedIds.push(strId);
+        setIsSaved(true);
       }
       
       await AsyncStorage.setItem('user_saved_artifacts', JSON.stringify(savedIds));
-      setIsSaved(!isSaved);
+      
+      Haptics.notificationAsync(exists ? Haptics.NotificationFeedbackType.Warning : Haptics.NotificationFeedbackType.Success);
+      Toast.show({
+        type: exists ? 'error' : 'success',
+        text1: exists ? t('removedFromFav') || 'Dihapus dari Koleksi' : t('addedToFav') || 'Disimpan ke Koleksi',
+        text2: exists ? 'Artefak dihapus dari koleksi Anda.' : 'Tersimpan aman di halaman Profil Anda.',
+        position: 'top',
+        visibilityTime: 3000,
+      });
     } catch (e) {
       console.warn("Failed to toggle save", e);
     }
@@ -440,9 +509,41 @@ export default function ArtifactDetailScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <ScrollView 
+      
+      {/* STICKY HEADER WITH DYNAMIC BACKGROUND */}
+      <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 }}>
+        <Animated.View 
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: isDark ? colors.background : '#ffffff' },
+            headerAnimatedStyle
+          ]}
+        />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12 }}>
+          <TouchableOpacity style={styles.floatBtn} onPress={() => router.back()} activeOpacity={0.8}>
+            <Feather name="arrow-left" size={20} color="#0f172a" />
+          </TouchableOpacity>
+          
+          <Animated.Text style={[{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: colors.text, paddingHorizontal: 10 }, titleAnimatedStyle]} numberOfLines={1}>
+            {artifact.name}
+          </Animated.Text>
+          
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity style={styles.floatBtn} onPress={handleShare} activeOpacity={0.8}>
+              <Feather name="share-2" size={20} color="#0f172a" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.floatBtn} onPress={toggleSave} activeOpacity={0.8}>
+              <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={isSaved ? "#fbbf24" : "#0f172a"} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      <Animated.ScrollView 
         showsVerticalScrollIndicator={false} 
         bounces={true}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#ffffff" colors={['#8B5E3C']} progressViewOffset={40} />
         }
@@ -455,7 +556,9 @@ export default function ArtifactDetailScreen() {
               : artifact.type === 'Monumen' ? FALLBACK_IMAGE2 : FALLBACK_IMAGE
             }
             style={styles.heroImage}
-            resizeMode="cover"
+            contentFit="cover"
+            transition={400}
+            cachePolicy="memory-disk"
           />
           <LinearGradient
             colors={['rgba(0,0,0,0.45)', 'transparent', 'rgba(0,0,0,0.3)']}
@@ -467,21 +570,6 @@ export default function ArtifactDetailScreen() {
           <View style={styles.imageCounter}>
             <Text style={styles.imageCounterText}>1 / {galleryPhotos.length || 1}</Text>
           </View>
-
-          {/* Floating Header Buttons */}
-          <SafeAreaView edges={['top']} style={styles.floatingHeader}>
-            <TouchableOpacity style={styles.floatBtn} onPress={() => router.back()}>
-              <Feather name="arrow-left" size={20} color="#0f172a" />
-            </TouchableOpacity>
-            <View style={styles.floatRight}>
-              <TouchableOpacity style={styles.floatBtn} onPress={handleShare}>
-                <Feather name="share-2" size={20} color="#0f172a" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.floatBtn} onPress={toggleSave}>
-                <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={isSaved ? "#fbbf24" : "#0f172a"} />
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
         </View>
 
         {/* ── Content Card ── */}
@@ -710,7 +798,7 @@ export default function ArtifactDetailScreen() {
 
           <View style={{ height: 32 }} />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Full-screen Photo Viewer (Premium Style) */}
       <Modal visible={isImageViewVisible} transparent={false} animationType="fade" onRequestClose={() => setIsImageViewVisible(false)}>
@@ -800,6 +888,8 @@ export default function ArtifactDetailScreen() {
               </View>
             </ScrollView>
           </View>
+        
+          <Toast />
         </View>
       </Modal>
 

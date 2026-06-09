@@ -16,7 +16,7 @@ export default function Index() {
 
   if (loading || hasSeenOnboarding === null) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#080e1a', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#ffffff" />
       </View>
     );

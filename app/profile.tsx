@@ -382,6 +382,13 @@ export default function ProfileScreen() {
                 sub={t('savedDesc')} 
                 onPress={() => router.push('/collections')} 
               />
+              <View style={styles.divider} />
+              <MenuRow 
+                icon="heart" 
+                title={t('likedItems') || 'Disukai'} 
+                sub={t('likedDesc') || 'Media yang Anda sukai'} 
+                onPress={() => router.push('/likes')} 
+              />
             </View>
           </View>
 
@@ -496,7 +503,11 @@ export default function ProfileScreen() {
           <View style={[styles.sectionGroup, { marginBottom: 0 }]}>
             <TouchableOpacity 
               style={styles.logoutBtn} 
-              onPress={async () => { await logout(); router.replace('/login'); }}
+              onPress={async () => { 
+                await import('@react-native-async-storage/async-storage').then(m => m.default.setItem('force_login_tab', 'true'));
+                await logout(); 
+                router.replace('/login'); 
+              }}
               activeOpacity={0.8}
             >
               <Feather name="log-out" size={18} color="#ef4444" />

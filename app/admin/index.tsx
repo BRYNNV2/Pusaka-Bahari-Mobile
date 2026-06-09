@@ -1340,7 +1340,11 @@ export default function AdminPanel() {
           <TouchableOpacity
             onPress={() => Alert.alert('Keluar', 'Yakin ingin keluar?', [
               { text: 'Batal', style: 'cancel' },
-              { text: 'Keluar', style: 'destructive', onPress: async () => { await logout(); router.replace('/login'); } },
+              { text: 'Keluar', style: 'destructive', onPress: async () => { 
+                await import('@react-native-async-storage/async-storage').then(m => m.default.setItem('force_login_tab', 'true'));
+                await logout(); 
+                router.replace('/login'); 
+              } },
             ])}
             style={styles.headerIcon}
           >
