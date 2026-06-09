@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ActivityIndicator, Dimensions, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polyline, UrlTile } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -19,13 +19,7 @@ export default function MapScreen() {
   const [activeSite, setActiveSite] = useState<any>(null);
   const [markers, setMarkers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const initialRegion = {
-    latitude: 0.9255,
-    longitude: 104.4170,
-    latitudeDelta: 0.008,
-    longitudeDelta: 0.008,
-  };
+  const webViewRef = useRef<WebView>(null);
 
   const fetchLocations = async () => {
     setLoading(true);
@@ -47,56 +41,142 @@ export default function MapScreen() {
     }, [])
   );
 
-  // Generate tour route from marker coordinates
-  const tourRoute = markers.map(m => ({
-    latitude: m.latitude,
-    longitude: m.longitude,
-  }));
+  // Center WebView Map when activeSite changes
+  useEffect(() => {
+    if (activeSite && webViewRef.current) {
+      const msg = JSON.stringify({
+        type: 'CENTER_ON',
+        lat: activeSite.latitude,
+        lng: activeSite.longitude
+      });
+      webViewRef.current.postMessage(msg);
+    }
+  }, [activeSite]);
+
+  const onMessage = (event: any) => {
+    try {
+      const { type, data } = JSON.parse(event.nativeEvent.data);
+      if (type === 'CLICK_MARKER') {
+        setActiveSite(data);
+      }
+    } catch (e) {
+      console.log('Error parsing Leaflet message:', e);
+    }
+  };
+
+  const generateMapHtml = () => {
+    const primaryColor = colors.primary;
+    const routeCoords = markers.map(m => [m.latitude, m.longitude]);
+    const routeCoordsJson = JSON.stringify(routeCoords);
+    const markersJson = JSON.stringify(markers);
+
+    // Choose CartoDB Voyager (light) or Dark Matter (dark) based on mode
+    const tileUrl = isDark 
+      ? 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+      : 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+
+    const backgroundColor = isDark ? '#0f172a' : '#f8fafc';
+    const markerBorderColor = isDark ? '#1e293b' : '#ffffff';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          body { margin: 0; padding: 0; }
+          #map { height: 100vh; width: 100vw; background: ${backgroundColor}; }
+          .custom-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(15, 23, 42, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .marker-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: ${primaryColor};
+            border: 2px solid ${markerBorderColor};
+          }
+          .leaflet-control-attribution { display: none !important; }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          const isDark = ${isDark};
+          const markers = ${markersJson};
+          const routeCoords = ${routeCoordsJson};
+
+          const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+          }).setView([0.9255, 104.4170], 14);
+
+          L.tileLayer('${tileUrl}', {
+            maxZoom: 19
+          }).addTo(map);
+
+          // Draw Polyline path
+          if (routeCoords.length >= 2) {
+            L.polyline(routeCoords, {
+              color: '${primaryColor}',
+              weight: 4,
+              dashArray: '5, 10'
+            }).addTo(map);
+          }
+
+          // Add Markers
+          markers.forEach(m => {
+            const icon = L.divIcon({
+              className: '',
+              html: '<div class="custom-marker"><div class="marker-dot"></div></div>',
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+            });
+
+            L.marker([m.latitude, m.longitude], { icon })
+              .addTo(map)
+              .on('click', () => {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CLICK_MARKER', data: m }));
+              });
+          });
+
+          // Handle messages from React Native to dynamically center
+          window.addEventListener('message', (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              if (message.type === 'CENTER_ON') {
+                map.setView([message.lat, message.lng], 16);
+              }
+            } catch(e) {}
+          });
+        </script>
+      </body>
+      </html>
+    `;
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <MapView
+      <WebView
+        ref={webViewRef}
         style={styles.map}
-        initialRegion={initialRegion}
-        showsUserLocation={true}
-        mapType={Platform.OS == "android" ? "none" : "standard"}
-        userInterfaceStyle={isDark ? "dark" : "light"}
-        showsCompass={false}
-      >
-        {Platform.OS === 'android' && (
-          <UrlTile
-            urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-            maximumZ={19}
-            flipY={false}
-          />
-        )}
-
-        {tourRoute.length >= 2 && (
-          <Polyline
-            coordinates={tourRoute}
-            strokeColor={colors.primary}
-            strokeWidth={4}
-            lineDashPattern={[2, 4]}
-          />
-        )}
-
-        {markers.map(marker => (
-          <Marker
-            key={marker.id}
-            coordinate={{
-              latitude: marker.latitude,
-              longitude: marker.longitude,
-            }}
-            onPress={() => setActiveSite(marker)}
-          >
-            <View style={styles.customMarker}>
-              <View style={styles.markerDot} />
-            </View>
-          </Marker>
-        ))}
-      </MapView>
+        originWhitelist={['*']}
+        source={{ html: generateMapHtml() }}
+        onMessage={onMessage}
+        domStorageEnabled={true}
+        javaScriptEnabled={true}
+      />
 
       {/* Floating Header */}
       <SafeAreaView edges={['top']} style={styles.headerContainer} pointerEvents="box-none">
