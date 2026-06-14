@@ -1,8 +1,13 @@
 import React from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { LogBox } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+]);
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider as AppThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
