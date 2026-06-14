@@ -423,7 +423,7 @@ export default function AdminPanel() {
       if (!agTitle.trim()) return null;
       return { 
         title: agTitle.trim(), 
-        description: agDesc.trim() || null, 
+        description: agDesc.trim() || '', 
         event_date: agDate.trim() || null,
         image_url: agImageUrl || null,
       };

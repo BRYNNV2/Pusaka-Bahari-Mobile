@@ -9,6 +9,17 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 280;
@@ -24,8 +35,9 @@ export default function HomeScreen() {
   const styles = getStyles(colors, isDark);
   const router = useRouter();
   const { isLoggedIn, user, isAdmin } = useAuth();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   // Hero carousel
   const heroScrollX = useRef(new Animated.Value(0)).current;
@@ -66,6 +78,9 @@ export default function HomeScreen() {
   const floatingAnim = useRef(new Animated.Value(0)).current;
   const hasShownAgendaModal = useRef(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [weatherData, setWeatherData] = useState<any>(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
     if (showFloatingAgenda) {
@@ -81,15 +96,151 @@ export default function HomeScreen() {
   const fetchUnreadCount = async () => {
     try {
       const uid = user?.id || 'guest';
+      const userCreatedAt = user?.created_at || new Date().toISOString();
       const lastRead = await AsyncStorage.getItem(`lastNotifRead_${uid}`);
-      let query = supabase.from('notifications').select('id', { count: 'exact', head: true });
+      
+      const hiddenStr = await AsyncStorage.getItem(`hiddenNotifs_${uid}`);
+      let hidden: number[] = hiddenStr ? JSON.parse(hiddenStr) : [];
+      if (user?.user_metadata?.hiddenNotifs) {
+        const dbHidden = user.user_metadata.hiddenNotifs;
+        if (Array.isArray(dbHidden)) {
+          hidden = Array.from(new Set([...hidden, ...dbHidden]));
+        }
+      }
+
+      let query = supabase
+        .from('notifications')
+        .select('id, created_at')
+        .gt('created_at', userCreatedAt);
+        
       if (lastRead) {
         query = query.gt('created_at', lastRead);
       }
-      const { count } = await query;
-      setUnreadCount(count || 0);
+      
+      const { data } = await query;
+      const unread = (data || []).filter(n => !hidden.includes(n.id));
+      setUnreadCount(unread.length);
     } catch (e) {
       setUnreadCount(0);
+    }
+  };
+
+  const triggerWeatherAlertNotification = async (windSpeed: number, weatherCode: number) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const lastAlerted = await AsyncStorage.getItem('@last_weather_alert_date');
+      if (lastAlerted === today) return;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: language === 'en' ? '⚠️ Extreme Weather Alert' : '⚠️ Peringatan Cuaca Buruk',
+          body: language === 'en' 
+            ? `High wind speeds (${windSpeed} km/h) or heavy rain detected. Crossing to Penyengat is NOT recommended.`
+            : `Angin kencang (${windSpeed} km/h) atau hujan lebat terdeteksi. Jalur penyeberangan pompong TIDAK disarankan.`,
+          data: { type: 'weather_alert' },
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: null,
+      });
+
+      await AsyncStorage.setItem('@last_weather_alert_date', today);
+    } catch (e) {
+      console.warn('Failed to send local notification:', e);
+    }
+  };
+
+  const fetchWeather = async () => {
+    try {
+      setWeatherLoading(true);
+      const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=0.9333&longitude=104.4333&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=Asia/Jakarta');
+      const data = await res.json();
+      if (data && data.current) {
+        const cur = data.current;
+        const code = cur.weather_code;
+        const temp = Math.round(cur.temperature_2m);
+        const wind = cur.wind_speed_10m;
+        const hum = cur.relative_humidity_2m;
+
+        // Map weather code
+        let status = 'Cerah';
+        let wIcon = 'sunny-outline';
+        if (code === 0) {
+          status = language === 'en' ? 'Sunny' : 'Cerah';
+          wIcon = 'sunny-outline';
+        } else if (code >= 1 && code <= 3) {
+          status = language === 'en' ? 'Partly Cloudy' : 'Berawan';
+          wIcon = 'cloud-outline';
+        } else if (code >= 51 && code <= 67) {
+          status = language === 'en' ? 'Rain' : 'Hujan';
+          wIcon = 'rainy-outline';
+        } else if (code >= 80 && code <= 82) {
+          status = language === 'en' ? 'Showers' : 'Hujan Lebat';
+          wIcon = 'rainy-outline';
+        } else if (code >= 95) {
+          status = language === 'en' ? 'Thunderstorm' : 'Badai Petir';
+          wIcon = 'thunderstorm-outline';
+        } else {
+          status = language === 'en' ? 'Cloudy' : 'Mendung';
+          wIcon = 'cloudy-outline';
+        }
+
+        // Map safety status
+        let sStatus = language === 'en' ? 'Safe to Sail' : 'Aman Berlayar';
+        let sDesc = language === 'en' ? 'Normal sea waves.' : 'Gelombang laut & angin normal.';
+        let sColor = '#22c55e'; // Green
+
+        if (wind > 20 || code >= 95 || code === 65 || code === 82) {
+          sStatus = language === 'en' ? 'Danger: High Waves' : 'Bahaya: Angin Kencang';
+          sDesc = language === 'en' ? 'Sailing not recommended.' : 'Tidak disarankan menyeberang.';
+          sColor = '#ef4444'; // Red
+          triggerWeatherAlertNotification(Math.round(wind), code);
+        } else if (wind > 14) {
+          sStatus = language === 'en' ? 'Caution Needed' : 'Harap Waspada';
+          sDesc = language === 'en' ? 'Moderate wind, watch waves.' : 'Kecepatan angin sedang.';
+          sColor = '#f59e0b'; // Orange
+        }
+
+        const weatherObj = {
+          temp,
+          windSpeed: Math.round(wind),
+          humidity: hum,
+          code,
+          statusText: status,
+          icon: wIcon,
+          safetyStatus: sStatus,
+          safetyDesc: sDesc,
+          safetyColor: sColor,
+        };
+
+        setWeatherData(weatherObj);
+        setIsOffline(false);
+        await AsyncStorage.setItem('@weather_cache', JSON.stringify(weatherObj));
+      }
+    } catch (e) {
+      console.warn('Weather fetch error, trying cache:', e);
+      setIsOffline(true);
+      try {
+        const cachedWeather = await AsyncStorage.getItem('@weather_cache');
+        if (cachedWeather) {
+          setWeatherData(JSON.parse(cachedWeather));
+        } else {
+          // Static Fallback
+          setWeatherData({
+            temp: 29,
+            windSpeed: 8,
+            humidity: 78,
+            code: 1,
+            statusText: language === 'en' ? 'Partly Cloudy' : 'Berawan',
+            icon: 'cloud-outline',
+            safetyStatus: language === 'en' ? 'Safe to Sail' : 'Aman Berlayar',
+            safetyDesc: language === 'en' ? 'Waves and winds normal.' : 'Kondisi angin & ombak aman.',
+            safetyColor: '#22c55e',
+          });
+        }
+      } catch (innerErr) {}
+    } finally {
+      setWeatherLoading(false);
     }
   };
 
@@ -110,6 +261,20 @@ export default function HomeScreen() {
     supabase.from('profiles').select('avatar_url').eq('id', user.id).single()
       .then(({ data }) => setAvatarUrl(data?.avatar_url ?? null));
   }, [user]);
+
+  useEffect(() => {
+    (async () => {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.log('Notification permission not granted');
+      }
+    })();
+  }, []);
 
   const handleFilterPress = () => {
     setShowFilterDropdown(!showFilterDropdown);
@@ -132,34 +297,69 @@ export default function HomeScreen() {
     else if (sortOrder === 'a-z') query = query.order('name', { ascending: true });
     else if (sortOrder === 'z-a') query = query.order('name', { ascending: false });
     
-    const { data } = await query;
-    setArtifactsData(data || []);
-    setLoadingContent(false);
+    try {
+      const { data, error } = await query;
+      if (error) throw error;
+      setArtifactsData(data || []);
+      setIsOffline(false);
+      const cacheKey = `@artifacts_cache_${activeCategory}_${sortOrder}`;
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data || []));
+    } catch (e) {
+      console.log('Error fetching artifacts, trying cache:', e);
+      setIsOffline(true);
+      try {
+        const cacheKey = `@artifacts_cache_${activeCategory}_${sortOrder}`;
+        const cachedData = await AsyncStorage.getItem(cacheKey);
+        if (cachedData) {
+          setArtifactsData(JSON.parse(cachedData));
+        } else {
+          const generalCache = await AsyncStorage.getItem('@artifacts_cache_Semua_newest');
+          if (generalCache) {
+            const parsed = JSON.parse(generalCache);
+            if (activeCategory !== 'Semua') {
+              setArtifactsData(parsed.filter((item: any) => item.type === activeCategory));
+            } else {
+              setArtifactsData(parsed);
+            }
+          }
+        }
+      } catch (innerErr) {}
+    } finally {
+      setLoadingContent(false);
+    }
   };
 
   const fetchAgendaFast = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
-      .from('agenda')
-      .select('*')
-      .gte('event_date', today) // Hanya ambil yang di masa depan/hari ini
-      .order('event_date', { ascending: true })
-      .limit(2);
-    
-    setAgendaData(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('agenda')
+        .select('*')
+        .gte('event_date', today) // Hanya ambil yang di masa depan/hari ini
+        .order('event_date', { ascending: true })
+        .limit(2);
+      
+      if (error) throw error;
+      setAgendaData(data || []);
+      await AsyncStorage.setItem('@agenda_cache', JSON.stringify(data || []));
 
-    // Tampilkan popup jika ada agenda terdekat, dibatasi maksimal 1x sehari pakai AsyncStorage
-    if (data && data.length > 0 && !hasShownAgendaModal.current) {
-      try {
+      // Tampilkan popup jika ada agenda terdekat, dibatasi maksimal 1x sehari pakai AsyncStorage
+      if (data && data.length > 0 && !hasShownAgendaModal.current) {
         const lastShownDate = await AsyncStorage.getItem('agenda_popup_date');
         if (lastShownDate !== today) {
           setShowAgendaModal(true);
           await AsyncStorage.setItem('agenda_popup_date', today);
         }
-      } catch (e) {
-        setShowAgendaModal(true);
+        hasShownAgendaModal.current = true;
       }
-      hasShownAgendaModal.current = true;
+    } catch (e) {
+      console.log('Error fetching agenda, trying cache:', e);
+      try {
+        const cached = await AsyncStorage.getItem('@agenda_cache');
+        if (cached) {
+          setAgendaData(JSON.parse(cached));
+        }
+      } catch (innerErr) {}
     }
   };
 
@@ -167,17 +367,19 @@ export default function HomeScreen() {
     useCallback(() => {
       fetchAgendaFast();
       fetchUnreadCount();
-    }, [])
+      fetchWeather();
+    }, [language])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
       fetchArtifacts(),
-      fetchAgendaFast()
+      fetchAgendaFast(),
+      fetchWeather()
     ]);
     setRefreshing(false);
-  }, [activeCategory]);
+  }, [activeCategory, language]);
 
   const filteredArtifacts = artifactsData.filter(item => 
     item.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -215,6 +417,41 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.headerRightActions}>
+              <View style={{ position: 'relative', zIndex: 1010 }}>
+                <TouchableOpacity 
+                  style={styles.langBtn} 
+                  onPress={() => setShowLangDropdown(!showLangDropdown)}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="globe" size={16} color={colors.text} />
+                  <Text style={styles.langBtnText}>{language.toUpperCase()}</Text>
+                  <Feather name={showLangDropdown ? "chevron-up" : "chevron-down"} size={12} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                {showLangDropdown && (
+                  <View style={styles.langDropdown}>
+                    <TouchableOpacity 
+                      style={[styles.langDropdownItem, language === 'id' && styles.langDropdownItemActive]}
+                      onPress={() => {
+                        setLanguage('id');
+                        setShowLangDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.langDropdownText}>🇮🇩  Indo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.langDropdownItem, language === 'en' && styles.langDropdownItemActive]}
+                      onPress={() => {
+                        setLanguage('en');
+                        setShowLangDropdown(false);
+                      }}
+                    >
+                      <Text style={styles.langDropdownText}>🇬🇧  Eng</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
               {isLoggedIn && (
                 <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
                   <Feather name="bell" size={20} color={colors.text} />
@@ -239,6 +476,18 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
+ 
+          {/* Offline Mode Banner */}
+          {isOffline && (
+            <View style={styles.offlineBanner}>
+              <Ionicons name="cloud-offline-outline" size={15} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.offlineBannerText}>
+                {language === 'en' 
+                  ? 'Offline Mode — Showing Cached Data' 
+                  : 'Mode Offline — Menampilkan Data Kaca (Cache)'}
+              </Text>
+            </View>
+          )}
 
           {/* 2. Hero Carousel */}
           <View style={styles.heroCard}>
@@ -365,35 +614,56 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Agenda Section — Dipindah ke Atas */}
-          {agendaData.length > 0 && (
-            <View style={styles.agendaSectionWrapper}>
-              <View style={styles.quickMenuHeaderRow}>
-                <Text style={styles.quickMenuTitle}>{t('upcomingEvents')}</Text>
-                <TouchableOpacity onPress={() => router.push('/agenda')}>
-                  <Text style={styles.quickMenuSeeAll}>{t('seeAll')}</Text>
-                </TouchableOpacity>
+          {/* 🌤️ Weather & Sea Safety Widget */}
+          <View style={styles.weatherCard}>
+            <View style={styles.weatherHeader}>
+              <View style={styles.weatherLocGroup}>
+                <Ionicons name="boat-outline" size={16} color={colors.primary} />
+                <Text style={styles.weatherLocTitle}>
+                  {language === 'en' ? 'Weather & Crossing Info' : 'Info Cuaca & Penyeberangan'}
+                </Text>
               </View>
-              
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.agendaScroll}>
-                {agendaData.map((item) => {
-                  const dateInfo = getDayAndMonth(item.event_date);
-                  return (
-                    <TouchableOpacity key={item.id} style={styles.agendaCardMini} activeOpacity={0.8} onPress={() => router.push('/agenda')}>
-                      <View style={styles.agendaDateMini}>
-                        <Text style={styles.agendaDayMini}>{dateInfo.day}</Text>
-                        <Text style={styles.agendaMonthMini}>{dateInfo.month}</Text>
-                      </View>
-                      <View style={styles.agendaContentMini}>
-                        <Text style={styles.agendaTitleMini} numberOfLines={1}>{item.title}</Text>
-                        <Text style={styles.agendaDescMini} numberOfLines={1}>{item.description}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+              <Text style={styles.weatherLocSubtitle}>P. Penyengat</Text>
             </View>
-          )}
+
+            {weatherLoading ? (
+              <View style={styles.weatherLoadingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.weatherLoadingText}>
+                  {language === 'en' ? 'Loading weather info...' : 'Memuat info cuaca...'}
+                </Text>
+              </View>
+            ) : weatherData ? (
+              <View style={styles.weatherMainContent}>
+                {/* Left Side: Temp & Stats */}
+                <View style={styles.weatherLeft}>
+                  <View style={styles.tempRow}>
+                    <Ionicons name={weatherData.icon as any} size={28} color={colors.primary} />
+                    <Text style={styles.tempText}>{weatherData.temp}°C</Text>
+                  </View>
+                  <Text style={styles.weatherStatus}>{weatherData.statusText}</Text>
+                  <Text style={styles.weatherDetailText}>
+                    💨 {weatherData.windSpeed} km/h  •  💧 {weatherData.humidity}%
+                  </Text>
+                </View>
+
+                {/* Right Side: Crossing Safety Indicator */}
+                <View style={[styles.weatherRight, { borderColor: weatherData.safetyColor }]}>
+                  <View style={[styles.safetyStatusIndicator, { backgroundColor: weatherData.safetyColor }]}>
+                    <Ionicons 
+                      name={weatherData.safetyColor === '#ef4444' ? 'alert-circle' : 'checkmark-circle'} 
+                      size={12} 
+                      color="#ffffff" 
+                    />
+                    <Text style={styles.safetyStatusText}>{weatherData.safetyStatus}</Text>
+                  </View>
+                  <Text style={styles.safetyDescText}>{weatherData.safetyDesc}</Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+
 
           {/* 4. Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
@@ -632,6 +902,53 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  langBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  langBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  langDropdown: {
+    position: 'absolute',
+    top: 50,
+    right: 0,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 6,
+    width: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  langDropdownItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  langDropdownItemActive: {
+    backgroundColor: colors.backgroundSecondary,
+  },
+  langDropdownText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
   bellBtn: {
     width: 44,
     height: 44,
@@ -793,6 +1110,139 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   dropdownItemTextActive: {
     color: colors.primary,
     fontWeight: '800',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f59e0b', // warning orange
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    marginHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  offlineBannerText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  weatherCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  weatherHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  weatherLocGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  weatherLocTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  weatherLocSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  weatherLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  weatherLoadingText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  weatherMainContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  weatherLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  tempRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tempText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
+  weatherStatus: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 2,
+  },
+  weatherDetailText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  weatherRight: {
+    width: 130,
+    borderLeftWidth: 1.5,
+    paddingLeft: 14,
+    gap: 4,
+    justifyContent: 'center',
+  },
+  safetyStatusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  safetyStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  safetyDescText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: '500',
+    lineHeight: 14,
   },
   emptyText: {
     fontSize: 14,

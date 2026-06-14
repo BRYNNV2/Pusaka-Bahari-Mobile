@@ -22,7 +22,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn, FadeInUp } from 'react-native-reanimated';
-import Toast from 'react-native-toast-message';
+import { CustomToastManager as Toast } from '@/components/CustomToast';
 
 const { width, height } = Dimensions.get('window');
 
@@ -302,7 +302,7 @@ export default function LoginScreen() {
 
 
         <View style={[styles.footerRow, { marginTop: 'auto', paddingTop: 32 }]}>
-          <Text style={[styles.footerText, { color: isDark ? '#cbd5e1' : '#64748b' }]}>Don't have an account? </Text>
+          <Text style={[styles.footerText, { color: isDark ? '#cbd5e1' : '#64748b' }]}>Don&apos;t have an account? </Text>
           <TouchableOpacity onPress={() => handleTabSwitch('register')}>
             <Text style={[styles.footerLink, { color: primaryBlue }]}>Sign up</Text>
           </TouchableOpacity>

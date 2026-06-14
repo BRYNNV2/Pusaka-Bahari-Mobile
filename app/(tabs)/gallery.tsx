@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import Toast from 'react-native-toast-message';
+import CustomToast, { CustomToastManager as Toast } from '@/components/CustomToast';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -902,7 +902,8 @@ export default function GalleryScreen() {
               </>
             )}
           
-          <Toast />
+
+          <CustomToast />
         </View>
       </Modal>
       )}

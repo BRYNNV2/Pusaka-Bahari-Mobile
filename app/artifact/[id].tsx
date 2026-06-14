@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 import {
   View,
   Text,
@@ -37,8 +38,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageViewing from 'react-native-image-viewing';
 import * as Haptics from 'expo-haptics';
-import Toast from 'react-native-toast-message';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import CustomToast, { CustomToastManager as Toast } from '@/components/CustomToast';
+import { WebView } from 'react-native-webview';
 
 const { width, height } = Dimensions.get('window');
 
@@ -57,9 +58,78 @@ export default function ArtifactDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isLoggedIn } = useAuth();
   const styles = getStyles(colors, isDark);
+
+  const generateMapHtml = () => {
+    if (!artifact?.latitude || !artifact?.longitude) return '';
+    const tileUrl = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+    const backgroundColor = '#f8fafc';
+    const markerDotColor = colors.primary || '#fbbf24';
+    const markerBorderColor = '#ffffff';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          body { margin: 0; padding: 0; }
+          #map { height: 100vh; width: 100vw; background: ${backgroundColor}; }
+          .custom-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(251, 191, 36, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .marker-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: ${markerDotColor};
+            border: 2px solid ${markerBorderColor};
+          }
+          .leaflet-control-attribution { display: none !important; }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false,
+            dragging: false,
+            touchZoom: false,
+            doubleClickZoom: false,
+            scrollWheelZoom: false,
+            boxZoom: false,
+            keyboard: false
+          }).setView([${Number(artifact.latitude)}, ${Number(artifact.longitude)}], 15);
+
+          L.tileLayer('${tileUrl}', {
+            maxZoom: 19
+          }).addTo(map);
+
+          const icon = L.divIcon({
+            className: '',
+            html: '<div class="custom-marker"><div class="marker-dot"></div></div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+
+          L.marker([${Number(artifact.latitude)}, ${Number(artifact.longitude)}], { icon }).addTo(map);
+        </script>
+      </body>
+      </html>
+    `;
+  };
 
   const [artifact, setArtifact] = useState<any>(null);
   const [gallery, setGallery]     = useState<any[]>([]);
@@ -68,6 +138,7 @@ export default function ArtifactDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded]   = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [showHoursDetail, setShowHoursDetail] = useState(false);
 
   // Player State
   const [showPlayer, setShowPlayer] = useState(false);
@@ -82,6 +153,74 @@ export default function ArtifactDetailScreen() {
   // AI State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+
+  // Audio Tour Guide (Speech TTS) State
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeechPaused, setIsSpeechPaused] = useState(false);
+
+  const startSpeech = () => {
+    if (!artifact?.description) return;
+    
+    // Clean string (remove markdown symbols)
+    const cleanText = artifact.description
+      .replace(/[#*`_~]/g, '')
+      .trim();
+      
+    Speech.speak(cleanText, {
+      language: language === 'en' ? 'en-US' : 'id-ID',
+      pitch: 1.0,
+      rate: 0.9,
+      onStart: () => {
+        setIsSpeaking(true);
+        setIsSpeechPaused(false);
+      },
+      onDone: () => {
+        setIsSpeaking(false);
+        setIsSpeechPaused(false);
+      },
+      onStopped: () => {
+        setIsSpeaking(false);
+        setIsSpeechPaused(false);
+      },
+      onError: (e) => {
+        console.warn('Speech error:', e);
+        setIsSpeaking(false);
+        setIsSpeechPaused(false);
+      }
+    });
+  };
+
+  const toggleSpeech = async () => {
+    // Stop standard music player if playing to avoid noise overlap
+    if (sound && isPlaying) {
+      await sound.pauseAsync().catch(() => {});
+      setIsPlaying(false);
+    }
+
+    if (isSpeaking) {
+      if (Platform.OS === 'android') {
+        await Speech.stop();
+        setIsSpeaking(false);
+        setIsSpeechPaused(false);
+      } else {
+        if (isSpeechPaused) {
+          await Speech.resume();
+          setIsSpeechPaused(false);
+        } else {
+          await Speech.pause();
+          setIsSpeechPaused(true);
+        }
+      }
+    } else {
+      startSpeech();
+    }
+  };
+
+  const stopSpeech = async () => {
+    await Speech.stop();
+    setIsSpeaking(false);
+    setIsSpeechPaused(false);
+  };
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const isPlayingRef = useRef<boolean>(false);
@@ -99,6 +238,7 @@ export default function ArtifactDetailScreen() {
           soundRef.current.pauseAsync().catch(() => {});
           setIsPlaying(false);
         }
+        Speech.stop().catch(() => {});
       };
     }, [])
   );
@@ -356,6 +496,11 @@ export default function ArtifactDetailScreen() {
   }));
 
   const playTrack = async (track: any) => {
+    // Stop Speech TTS if playing
+    await Speech.stop().catch(() => {});
+    setIsSpeaking(false);
+    setIsSpeechPaused(false);
+
     if (sound) {
       await sound.unloadAsync();
       setSound(null);
@@ -469,11 +614,25 @@ export default function ArtifactDetailScreen() {
   } else {
     // Parser Waktu Real-time (ala Google Maps)
     const hoursStr = artifact.operational_hours.toLowerCase();
-    
+    const todayIndex = new Date().getDay(); // 0 is Sunday, 1 is Monday...
+
+    // Check if today is closed
+    let isClosedToday = false;
+    if (todayIndex === 0 && (hoursStr.includes('minggu tutup') || hoursStr.includes('minggu libur') || hoursStr.includes('senin - sabtu') || hoursStr.includes('senin s/d sabtu') || hoursStr.includes('senin-sabtu'))) {
+      isClosedToday = true;
+    }
+    if ((todayIndex === 0 || todayIndex === 6) && (hoursStr.includes('senin - jumat') || hoursStr.includes('senin s/d jumat') || hoursStr.includes('senin-jumat'))) {
+      isClosedToday = true;
+    }
+    // Only flag general closed/libur if it doesn't mention specific days
+    if ((hoursStr.includes('libur') || hoursStr.includes('tutup')) && !hoursStr.includes('minggu') && !hoursStr.includes('sabtu')) {
+      isClosedToday = true;
+    }
+
     if (hoursStr.includes('24 jam')) {
       isOpenNow = true;
-    } else if (hoursStr.includes('libur') || hoursStr.includes('tutup')) {
-      isOpenNow = false; // Asumsi jika ada kata libur/tutup secara eksplisit
+    } else if (isClosedToday) {
+      isOpenNow = false;
     } else {
       // Cari pola jam (contoh: 08:00 - 17:00 atau 08.00 - 17.00)
       const timeMatch = hoursStr.match(/(\d{1,2})[:.](\d{2})\s*-\s*(\d{1,2})[:.](\d{2})/);
@@ -504,6 +663,42 @@ export default function ArtifactDetailScreen() {
       statusColor = "#22c55e"; // Fallback green
     }
   }
+
+  const getWeeklyHours = () => {
+    const hours = artifact.operational_hours || '08:00 - 17:00';
+    const hoursLower = hours.toLowerCase();
+    
+    if (hoursLower.includes('24 jam') || hoursLower.includes('24h')) {
+      return [
+        { day: 'Senin', time: 'Buka 24 Jam', active: true },
+        { day: 'Selasa', time: 'Buka 24 Jam', active: true },
+        { day: 'Rabu', time: 'Buka 24 Jam', active: true },
+        { day: 'Kamis', time: 'Buka 24 Jam', active: true },
+        { day: 'Jumat', time: 'Buka 24 Jam', active: true },
+        { day: 'Sabtu', time: 'Buka 24 Jam', active: true },
+        { day: 'Minggu', time: 'Buka 24 Jam', active: true },
+      ];
+    }
+
+    const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+    
+    // Extract the raw time range (e.g. "08.00 - 17.00") to display it nicely
+    const timeMatch = hours.match(/(\d{1,2})[:.](\d{2})\s*-\s*(\d{1,2})[:.](\d{2})/);
+    const timeRange = timeMatch ? timeMatch[0] : hours;
+
+    const isMingguTutup = hoursLower.includes('minggu tutup') || hoursLower.includes('minggu libur') || hoursLower.includes('senin - sabtu') || hoursLower.includes('senin s/d sabtu') || hoursLower.includes('senin-sabtu');
+    const isSabtuMingguTutup = hoursLower.includes('senin - jumat') || hoursLower.includes('senin s/d jumat') || hoursLower.includes('senin-jumat');
+
+    return days.map(d => {
+      if (d === 'Minggu' && (isMingguTutup || isSabtuMingguTutup)) {
+        return { day: d, time: 'Tutup / Libur', active: false };
+      }
+      if (d === 'Sabtu' && isSabtuMingguTutup) {
+        return { day: d, time: 'Tutup / Libur', active: false };
+      }
+      return { day: d, time: timeRange, active: true };
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -613,18 +808,84 @@ export default function ArtifactDetailScreen() {
           <View style={styles.divider} />
 
           {/* Open Status */}
-          <View style={styles.openStatusRow}>
-            <View style={[styles.openDot, { backgroundColor: statusColor }]} />
-            <Text style={styles.openText}>{openStatusText}</Text>
-            <Feather name="chevron-down" size={18} color="#64748b" />
-          </View>
+          <TouchableOpacity 
+            style={styles.openStatusRow} 
+            onPress={() => {
+              setShowHoursDetail(!showHoursDetail);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <View style={[styles.openDot, { backgroundColor: statusColor }]} />
+              <Text style={styles.openText}>{openStatusText}</Text>
+            </View>
+            <Feather name={showHoursDetail ? "chevron-up" : "chevron-down"} size={18} color="#64748b" />
+          </TouchableOpacity>
+
+          {/* Collapsible Weekly Schedule */}
+          {showHoursDetail && (
+            <View style={styles.hoursDropdown}>
+              {getWeeklyHours().map((item, index) => {
+                const todayDayIndex = new Date().getDay();
+                const isToday = todayDayIndex === (index === 6 ? 0 : index + 1);
+                return (
+                  <View key={item.day} style={[styles.hoursRow, isToday && styles.hoursRowToday]}>
+                    <Text style={[styles.hoursDayText, isToday && styles.hoursTodayText]}>
+                      {item.day} {isToday ? `(Hari Ini)` : ''}
+                    </Text>
+                    <Text style={[styles.hoursTimeText, isToday && styles.hoursTodayText, !item.active && { color: '#ef4444' }]}>
+                      {item.time}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
           {/* Divider */}
           <View style={styles.divider} />
 
           {/* Description */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('artDescTitle')}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={styles.sectionTitle}>{t('artDescTitle')}</Text>
+              
+              {artifact.description ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.ttsBtn, 
+                      isSpeaking && styles.ttsBtnActive
+                    ]}
+                    onPress={toggleSpeech}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name={isSpeaking ? (isSpeechPaused ? "play-circle" : "pause-circle") : "volume-medium"} 
+                      size={14} 
+                      color={isSpeaking ? "#ffffff" : colors.primary} 
+                    />
+                    <Text style={[styles.ttsBtnText, isSpeaking && styles.ttsBtnTextActive]}>
+                      {isSpeaking 
+                        ? (isSpeechPaused ? 'Lanjutkan' : 'Jeda Suara') 
+                        : 'Asisten Suara'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {isSpeaking && (
+                    <TouchableOpacity 
+                      style={styles.ttsStopBtn} 
+                      onPress={stopSpeech}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="stop" size={12} color="#ffffff" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : null}
+            </View>
+
             <Text style={styles.descText}>
               {expanded ? desc : shortDesc}
             </Text>
@@ -677,34 +938,14 @@ export default function ArtifactDetailScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('artMapSection')}</Text>
               <View style={styles.mapContainer}>
-                <MapView
+                <WebView
+                  originWhitelist={['*']}
+                  source={{ html: generateMapHtml() }}
                   style={styles.map}
-                  initialRegion={{
-                    latitude: Number(artifact.latitude),
-                    longitude: Number(artifact.longitude),
-                    latitudeDelta: 0.005,
-                    longitudeDelta: 0.005,
-                  }}
                   scrollEnabled={false}
-                  zoomEnabled={false}
-                  mapType={Platform.OS == "android" ? "none" : "standard"}
-                  userInterfaceStyle={isDark ? "dark" : "light"}
-                >
-                  {Platform.OS === 'android' && (
-                    <UrlTile
-                      urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                      maximumZ={19}
-                      flipY={false}
-                    />
-                  )}
-                  <Marker
-                    coordinate={{
-                      latitude: Number(artifact.latitude),
-                      longitude: Number(artifact.longitude),
-                    }}
-                    title={artifact.name}
-                  />
-                </MapView>
+                  domStorageEnabled={true}
+                  javaScriptEnabled={true}
+                />
                 <TouchableOpacity style={styles.mapOverlayButton} onPress={openMaps} activeOpacity={0.8}>
                   <Text style={styles.mapOverlayText}>{t('artOpenMap')}</Text>
                   <Feather name="external-link" size={14} color="#0f172a" style={{ marginLeft: 6 }} />
@@ -889,7 +1130,8 @@ export default function ArtifactDetailScreen() {
             </ScrollView>
           </View>
         
-          <Toast />
+
+          <CustomToast />
         </View>
       </Modal>
 
@@ -1165,9 +1407,42 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   secondaryBtn:    { width: 54, height: 54, backgroundColor: colors.border, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 
   // Open Status
-  openStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  openStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   openDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' },
   openText:      { flex: 1, fontSize: 13, color: colors.text, fontWeight: '600' },
+  hoursDropdown: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 8,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  hoursRowToday: {
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+  },
+  hoursDayText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  hoursTimeText: {
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  hoursTodayText: {
+    color: colors.primary || '#fbbf24',
+    fontWeight: '700',
+  },
 
   // Section
   section:         { marginBottom: 20 },
@@ -1176,6 +1451,37 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   seeAll:          { fontSize: 13, fontWeight: '600', color: colors.text, textDecorationLine: 'underline' },
   descText:        { fontSize: 14, color: colors.textSecondary, lineHeight: 22 },
   readMore:        { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: 6 },
+  ttsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundSecondary,
+  },
+  ttsBtnActive: {
+    backgroundColor: colors.primary || '#fbbf24',
+    borderColor: colors.primary || '#fbbf24',
+  },
+  ttsBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  ttsBtnTextActive: {
+    color: '#ffffff',
+  },
+  ttsStopBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // Attributes
   attributeGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

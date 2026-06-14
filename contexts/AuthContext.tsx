@@ -2,6 +2,8 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 
 type AuthContextType = {
   isLoggedIn: boolean;
@@ -43,6 +45,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  const handleDeepLink = async (url: string | null) => {
+    if (!url) return;
+    console.log('Incoming Deep Link URL:', url);
+    
+    if (url.includes('#') && url.includes('access_token=')) {
+      const hash = url.split('#')[1];
+      if (hash) {
+        const params: { [key: string]: string } = {};
+        hash.split('&').forEach(pair => {
+          const [key, value] = pair.split('=');
+          if (key && value) {
+            params[key] = decodeURIComponent(value);
+          }
+        });
+
+        if (params.access_token) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token || '',
+          });
+          
+          if (!error && data.session) {
+            console.log('Supabase session successfully restored via deep link!');
+            setTimeout(() => {
+              router.replace('/reset-password');
+            }, 500);
+          } else {
+            console.error('Failed to set session via deep link:', error?.message);
+          }
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -67,7 +104,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Listen for deep links when app is running
+    const linkSubscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    // Check if the app was opened by a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink(url);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      linkSubscription.remove();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<{ error: string | null }> => {

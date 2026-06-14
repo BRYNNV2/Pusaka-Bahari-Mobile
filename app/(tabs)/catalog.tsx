@@ -34,16 +34,7 @@ type ArtifactItem = {
   location?: string;
 };
 
-const ENCYCLOPEDIA_DATA: ArtifactItem[] = [
-  { id: 'enc_1', type: 'Tradisi', name: 'Perahu Jong', year: 'Permainan', description: 'Permainan rakyat pesisir Kepulauan Riau berupa miniatur perahu layar yang melaju kencang ditiup angin laut.', location: 'Pantai Tanjung Siambang' },
-  { id: 'enc_2', type: 'Tradisi', name: 'Tari Zapin', year: 'Warisan', description: 'Tarian khas rumpun Melayu yang banyak mendapat pengaruh dari budaya Arab. Mengutamakan kelincahan gerak kaki.', location: 'Kesenian Rakyat' },
-  { id: 'enc_3', type: 'Benda', name: 'Keris Sempena', year: 'Abad 18', description: 'Senjata tikam peninggalan kebesaran para panglima dan bangsawan kerajaan Melayu Riau-Lingga.', location: 'Museum Linggam Cahaya' },
-  { id: 'enc_4', type: 'Tradisi', name: 'Perahu Pencalang', year: 'Transportasi', description: 'Kapal layar niaga tradisional Nusantara berukuran sedang yang sering digunakan untuk memantau musuh di lautan bebas.', location: 'Pulau Penyengat' },
-  { id: 'enc_5', type: 'Tradisi', name: 'Perahu Kolek', year: 'Transportasi', description: 'Perahu kayu kecil khas Melayu pesisir yang digerakkan menggunakan dayung atau layar kecil untuk mencari ikan di perairan dangkal.', location: 'Kampung Nelayan Pesisir' },
-  { id: 'enc_6', type: 'Tradisi', name: 'Sampan', year: 'Transportasi', description: 'Perahu tradisional beralas datar khas perairan sungai dan pantai, sangat ikonik sebagai alat transportasi penghubung antar pulau kecil.', location: 'Perairan Kepri' },
-  { id: 'enc_7', type: 'Benda', name: 'Bubu Tradisional', year: 'Alat Tangkap', description: 'Alat perangkap ikan ramah lingkungan yang terbuat dari anyaman rotan atau bambu. Dirancang agar ikan mudah masuk namun sulit keluar.', location: 'Permukiman Nelayan' },
-  { id: 'enc_8', type: 'Tradisi', name: 'Kelong Tancap', year: 'Alat Tangkap', description: 'Bangunan penangkap ikan lepas pantai yang terbuat dari batang kayu atau nibung yang ditancapkan ke dasar laut.', location: 'Perairan Bintan & Batam' },
-];
+
 
 const KAMUS_DATA = [
   { id: 'k1', term: 'Angin Muson', definition: 'Angin pergantian musim yang digunakan pelaut kuno untuk menentukan waktu paling aman untuk berlayar.' },
@@ -115,11 +106,8 @@ export default function CatalogScreen() {
     else setHasMore(true);
 
     if (pageNum === 0) {
-      // Halaman pertama: gabungkan data DB + ensiklopedia statis
-      const combinedData = fetched.length > 0 ? [...fetched, ...ENCYCLOPEDIA_DATA] : [...ENCYCLOPEDIA_DATA];
-      setDatabase(combinedData);
+      setDatabase(fetched);
     } else {
-      // Halaman berikutnya: tambahkan data baru ke state yang sudah ada
       setDatabase(prev => [...prev, ...fetched]);
     }
 

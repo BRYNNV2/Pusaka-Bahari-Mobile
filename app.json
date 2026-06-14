@@ -19,12 +19,7 @@
         "foregroundImage": "./assets/images/icon.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.myhanni.Mobileproject",
-      "config": {
-        "googleMaps": {
-          "apiKey": "ISI_API_KEY_GOOGLE_MAPS_DISINI"
-        }
-      }
+      "package": "com.myhanni.Mobileproject"
     },
     "web": {
       "output": "static",

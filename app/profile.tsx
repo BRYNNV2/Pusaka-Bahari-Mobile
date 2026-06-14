@@ -354,7 +354,7 @@ export default function ProfileScreen() {
                 )}
                 <Text style={styles.profileEmailTxt}>{user?.email}</Text>
                 {phone ? <Text style={styles.profilePhoneTxt}>{phone}</Text> : null}
-                {bio ? <Text style={styles.bioText}>"{bio}"</Text> : null}
+                {bio ? <Text style={styles.bioText}>&quot;{bio}&quot;</Text> : null}
               </>
             )}
             

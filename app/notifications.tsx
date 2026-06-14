@@ -48,17 +48,35 @@ export default function NotificationsScreen() {
   const fetchNotifications = async () => {
     setLoading(true);
     const uid = user?.id || 'guest';
+    const userCreatedAt = user?.created_at || new Date().toISOString();
+
+    // 1. Get hidden IDs from AsyncStorage
     const hiddenStr = await AsyncStorage.getItem(`hiddenNotifs_${uid}`);
-    const hidden = hiddenStr ? JSON.parse(hiddenStr) : [];
+    let hidden: number[] = hiddenStr ? JSON.parse(hiddenStr) : [];
+
+    // 2. Merge with hidden IDs from Supabase Auth User Metadata if available
+    if (user?.user_metadata?.hiddenNotifs) {
+      const dbHidden = user.user_metadata.hiddenNotifs;
+      if (Array.isArray(dbHidden)) {
+        hidden = Array.from(new Set([...hidden, ...dbHidden]));
+      }
+    }
     setHiddenIds(hidden);
 
+    // 3. Fetch notifications
     const { data: rows } = await supabase
       .from('notifications')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
       
-    const filtered = (rows as NotifItem[] || []).filter(n => !hidden.includes(n.id));
+    // 4. Filter out notifications created BEFORE user registered + those that are hidden
+    const filtered = (rows as NotifItem[] || []).filter(n => {
+      const isNewerThanUser = new Date(n.created_at) >= new Date(userCreatedAt);
+      const isNotHidden = !hidden.includes(n.id);
+      return isNewerThanUser && isNotHidden;
+    });
+    
     setData(filtered);
     setLoading(false);
 
@@ -67,10 +85,19 @@ export default function NotificationsScreen() {
 
   const deleteNotif = async (id: number) => {
     const uid = user?.id || 'guest';
-    const newHidden = [...hiddenIds, id];
+    const newHidden = Array.from(new Set([...hiddenIds, id]));
     setHiddenIds(newHidden);
     setData(prev => prev.filter(n => n.id !== id));
+    
+    // Save to AsyncStorage
     await AsyncStorage.setItem(`hiddenNotifs_${uid}`, JSON.stringify(newHidden));
+
+    // Sync to Supabase user metadata
+    if (user) {
+      await supabase.auth.updateUser({
+        data: { hiddenNotifs: newHidden }
+      }).catch(e => console.warn('Gagal sinkronisasi hapus notifikasi:', e));
+    }
   };
 
   const clearAll = async () => {
@@ -79,10 +106,19 @@ export default function NotificationsScreen() {
       { text: t('notifClearCancel'), style: 'cancel' },
       { text: t('notifClearConfirm'), onPress: async () => {
         const uid = user?.id || 'guest';
-        const allIdsToHide = [...hiddenIds, ...data.map(n => n.id)];
+        const allIdsToHide = Array.from(new Set([...hiddenIds, ...data.map(n => n.id)]));
         setHiddenIds(allIdsToHide);
         setData([]);
+        
+        // Save to AsyncStorage
         await AsyncStorage.setItem(`hiddenNotifs_${uid}`, JSON.stringify(allIdsToHide));
+
+        // Sync to Supabase user metadata
+        if (user) {
+          await supabase.auth.updateUser({
+            data: { hiddenNotifs: allIdsToHide }
+          }).catch(e => console.warn('Gagal sinkronisasi bersihkan notifikasi:', e));
+        }
       }}
     ]);
   };
