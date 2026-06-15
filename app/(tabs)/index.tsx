@@ -663,7 +663,37 @@ export default function HomeScreen() {
             ) : null}
           </View>
 
-
+          {/* 📜 Raja Ali Haji Biography Card */}
+          <TouchableOpacity 
+            style={styles.heroBioCard} 
+            activeOpacity={0.9}
+            onPress={() => router.push('/raja-ali-haji')}
+          >
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#fef3c7', '#fffbeb']}
+              style={styles.heroBioGradient}
+            >
+              <View style={styles.heroBioLeft}>
+                <View style={styles.heroBioBadge}>
+                  <MaterialCommunityIcons name="history" size={12} color={colors.primary} />
+                  <Text style={styles.heroBioBadgeText}>
+                    {language === 'en' ? 'National Hero' : 'Pahlawan Nasional'}
+                  </Text>
+                </View>
+                <Text style={styles.heroBioTitle}>Raja Ali Haji</Text>
+                <Text style={styles.heroBioSubtitle} numberOfLines={2}>
+                  {language === 'en' 
+                    ? 'Explore the life, famous works, and royal Bugis-Malay lineage of Raja Ali Haji.'
+                    : 'Pelajari riwayat hidup, karya agung Gurindam 12, dan silsilah keturunan beliau.'}
+                </Text>
+              </View>
+              <View style={styles.heroBioRight}>
+                <View style={styles.heroBioIconCircle}>
+                  <Feather name="book-open" size={24} color={colors.primary} />
+                </View>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
 
           {/* 4. Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
@@ -1653,5 +1683,66 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: 11,
     marginLeft: 4,
     fontWeight: '500',
+  },
+  heroBioCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 8,
+  },
+  heroBioGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 20,
+  },
+  heroBioLeft: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  heroBioBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(212,175,55,0.15)' : 'rgba(212,175,55,0.1)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 4,
+  },
+  heroBioBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  heroBioTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  heroBioSubtitle: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 16,
+  },
+  heroBioRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroBioIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15, 23, 42, 0.04)',
+    justifyContent: 'center',
+    alignItems: 'center',
   }
 });

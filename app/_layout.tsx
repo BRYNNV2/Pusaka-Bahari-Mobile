@@ -58,6 +58,7 @@ function RootLayoutNav() {
         <Stack.Screen name="admin" />
         <Stack.Screen name="artifact/[id]" />
         <Stack.Screen name="reset-password" />
+        <Stack.Screen name="raja-ali-haji" />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} translucent backgroundColor="transparent" />
