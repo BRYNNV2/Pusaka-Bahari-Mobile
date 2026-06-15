@@ -83,15 +83,13 @@ export default function HomeScreen() {
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    if (showFloatingAgenda) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatingAnim, { toValue: -8, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
-          Animated.timing(floatingAnim, { toValue: 0, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) })
-        ])
-      ).start();
-    }
-  }, [showFloatingAgenda]);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatingAnim, { toValue: -8, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        Animated.timing(floatingAnim, { toValue: 0, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) })
+      ])
+    ).start();
+  }, []);
 
   const fetchUnreadCount = async () => {
     try {
@@ -663,37 +661,7 @@ export default function HomeScreen() {
             ) : null}
           </View>
 
-          {/* 📜 Raja Ali Haji Biography Card */}
-          <TouchableOpacity 
-            style={styles.heroBioCard} 
-            activeOpacity={0.9}
-            onPress={() => router.push('/raja-ali-haji')}
-          >
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#fef3c7', '#fffbeb']}
-              style={styles.heroBioGradient}
-            >
-              <View style={styles.heroBioLeft}>
-                <View style={styles.heroBioBadge}>
-                  <MaterialCommunityIcons name="history" size={12} color={colors.primary} />
-                  <Text style={styles.heroBioBadgeText}>
-                    {language === 'en' ? 'National Hero' : 'Pahlawan Nasional'}
-                  </Text>
-                </View>
-                <Text style={styles.heroBioTitle}>Raja Ali Haji</Text>
-                <Text style={styles.heroBioSubtitle} numberOfLines={2}>
-                  {language === 'en' 
-                    ? 'Explore the life, famous works, and royal Bugis-Malay lineage of Raja Ali Haji.'
-                    : 'Pelajari riwayat hidup, karya agung Gurindam 12, dan silsilah keturunan beliau.'}
-                </Text>
-              </View>
-              <View style={styles.heroBioRight}>
-                <View style={styles.heroBioIconCircle}>
-                  <Feather name="book-open" size={24} color={colors.primary} />
-                </View>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+
 
           {/* 4. Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
@@ -887,6 +855,29 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
       )}
+
+      {/* Permanent Premium Floating FAB for Raja Ali Haji (Biografi & Silsilah) */}
+      <View 
+        style={[
+          styles.floatingBioFABContainer, 
+          { 
+            bottom: (showFloatingAgenda && agendaData.length > 0) ? 134 : 24
+          }
+        ]}
+      >
+        <TouchableOpacity 
+          activeOpacity={0.85}
+          onPress={() => router.push('/raja-ali-haji')}
+          style={styles.floatingBioFABBtn}
+        >
+          <LinearGradient
+            colors={isDark ? ['#d4af37', '#856404'] : ['#f59e0b', '#d97706']}
+            style={styles.floatingBioFABGradient}
+          >
+            <MaterialCommunityIcons name="crown" size={24} color="#ffffff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
 
     </View>
   );
@@ -1684,65 +1675,31 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     marginLeft: 4,
     fontWeight: '500',
   },
-  heroBioCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 20,
-    elevation: 3,
+  floatingBioFABContainer: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 998,
+    elevation: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
   },
-  heroBioGradient: {
-    flexDirection: 'row',
+  floatingBioFABBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 18,
+  },
+  floatingBioFABGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 20,
-  },
-  heroBioLeft: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  heroBioBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: isDark ? 'rgba(212,175,55,0.15)' : 'rgba(212,175,55,0.1)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 8,
-    gap: 4,
-  },
-  heroBioBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  heroBioTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  heroBioSubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 16,
-  },
-  heroBioRight: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroBioIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15, 23, 42, 0.04)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: 'rgba(255,255,255,0.25)',
   }
 });
