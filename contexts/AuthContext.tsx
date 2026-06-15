@@ -137,11 +137,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        checkAdminStatus(session.user.id).then((admin) => {
-          setIsAdmin(admin);
-        }).catch((err) => {
-          console.warn('Failed to check admin status:', err);
-        });
+        // Run database queries on a separate event loop tick to prevent locking/deadlocks in the SDK
+        setTimeout(() => {
+          checkAdminStatus(session.user.id).then((admin) => {
+            setIsAdmin(admin);
+          }).catch((err) => {
+            console.warn('Failed to check admin status:', err);
+          });
+        }, 0);
       } else {
         setIsAdmin(false);
       }
