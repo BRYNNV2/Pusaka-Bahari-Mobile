@@ -8,6 +8,9 @@ import {
   Dimensions,
   Image,
   StatusBar,
+  LayoutAnimation,
+  UIManager,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -23,6 +26,7 @@ type GenealogyNode = {
   name: string;
   role?: string;
   relation: string;
+  bio?: string;
   children?: GenealogyNode[];
 };
 
@@ -31,6 +35,19 @@ export default function RajaAliHajiScreen() {
   const { colors, isDark } = useTheme();
   const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'bio' | 'tree'>('bio');
+  const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
+
+  // Enable LayoutAnimation on Android
+  if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+
+  const toggleNode = (name: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedNodes(prev => 
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    );
+  };
 
   const styles = getStyles(colors, isDark);
 
@@ -39,31 +56,49 @@ export default function RajaAliHajiScreen() {
     name: "Daeng Chelak",
     role: "Yang Dipertuan Muda Riau II",
     relation: "Kakek Buyut (Great-Grandfather)",
+    bio: language === 'en'
+      ? "Opu Daeng Chelak was a Bugis prince who became the second Yang Dipertuan Muda (Viceroy) of the Riau-Johor Empire. He established the Bugis political dynasty in the Malay world and laid the foundation for the Riau-Lingga Sultanate."
+      : "Opu Daeng Chelak adalah pangeran Bugis yang menjadi Yang Dipertuan Muda (Wakil Sultan) Riau-Johor ke-2. Beliau mendirikan dinasti politik Bugis di dunia Melayu dan meletakkan dasar Kesultanan Riau-Lingga.",
     children: [
       {
         name: "Raja Haji Fisabilillah",
         role: "Yang Dipertuan Muda Riau IV (Pahlawan Nasional)",
         relation: "Kakek (Grandfather)",
+        bio: language === 'en'
+          ? "Raja Haji Fisabilillah (1727–1784) was a fearless Bugis-Malay warrior and the 4th Viceroy of Riau. He heroically fell in the Battle of Teluk Ketapang against the Dutch VOC in 1784, and was declared a National Hero of Indonesia in 1997."
+          : "Raja Haji Fisabilillah (1727–1784) adalah panglima perang Bugis-Melayu dan Yang Dipertuan Muda Riau ke-4. Beliau gugur secara heroik dalam Pertempuran Teluk Ketapang melawan VOC Belanda tahun 1784, dan ditetapkan sebagai Pahlawan Nasional Indonesia tahun 1997.",
         children: [
           {
             name: "Raja Ahmad (Engku Haji Tua)",
             role: "YDM Riau VI (Penulis Sejarah)",
             relation: "Ayah (Father)",
+            bio: language === 'en'
+              ? "Raja Ahmad, known as Engku Haji Tua, was the 6th Viceroy of Riau and a prolific writer. He authored important historical texts and was instrumental in nurturing the literary talent of his son, Raja Ali Haji."
+              : "Raja Ahmad, dikenal sebagai Engku Haji Tua, adalah Yang Dipertuan Muda Riau ke-6 dan penulis yang produktif. Beliau menulis teks-teks sejarah penting dan berperan besar dalam membina bakat sastra putranya, Raja Ali Haji.",
             children: [
               {
                 name: "Raja Ali Haji",
                 role: "Pujangga & Pahlawan Nasional (Penulis Gurindam 12)",
                 relation: "Tokoh Utama",
+                bio: language === 'en'
+                  ? "Raja Ali Haji (1808–1873) is the central figure — a 19th-century Bugis-Malay scholar, historian, and poet. Author of Gurindam Dua Belas (1847), Tuhfat al-Nafis, and Bustan al-Katibin. Declared National Hero of Indonesia in 2004 as the Father of the Indonesian Language."
+                  : "Raja Ali Haji (1808–1873) adalah tokoh utama — ulama, sejarawan, dan pujangga Melayu-Bugis abad ke-19. Penulis Gurindam Dua Belas (1847), Tuhfat al-Nafis, dan Bustan al-Katibin. Ditetapkan Pahlawan Nasional Indonesia tahun 2004 sebagai Bapak Bahasa Indonesia.",
                 children: [
                   {
                     name: "Raja Hasan",
                     role: "Pujangga Istana Riau",
                     relation: "Anak (Son)",
+                    bio: language === 'en'
+                      ? "Raja Hasan was the son of Raja Ali Haji who continued his father's literary legacy as a court poet (pujangga) of the Riau-Lingga Sultanate."
+                      : "Raja Hasan adalah putra Raja Ali Haji yang meneruskan warisan sastra ayahnya sebagai pujangga istana Kesultanan Riau-Lingga.",
                   },
                   {
                     name: "Raja Khalid Hitam",
                     role: "Intelektual & Penulis Riau",
                     relation: "Anak (Son)",
+                    bio: language === 'en'
+                      ? "Raja Khalid Hitam was an intellectual and writer from the Riau court who contributed to preserving and expanding upon the scholarly works of his father, Raja Ali Haji."
+                      : "Raja Khalid Hitam adalah intelektual dan penulis dari istana Riau yang berkontribusi dalam melestarikan dan mengembangkan karya-karya ilmiah ayahnya, Raja Ali Haji.",
                   }
                 ]
               }
@@ -77,31 +112,53 @@ export default function RajaAliHajiScreen() {
   const renderBio = () => {
     return (
       <Animated.View entering={FadeIn.duration(400)} style={styles.bioContainer}>
-        {/* Quick Info Grid */}
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <MaterialCommunityIcons name="calendar-star" size={24} color={colors.primary} />
-            <Text style={styles.infoCardLabel}>{language === 'en' ? 'Birth' : 'Lahir'}</Text>
-            <Text style={styles.infoCardVal}>1808</Text>
-            <Text style={styles.infoCardSub}>Selangor, Malaysia</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <MaterialCommunityIcons name="calendar-remove" size={24} color={colors.primary} />
-            <Text style={styles.infoCardLabel}>{language === 'en' ? 'Death' : 'Wafat'}</Text>
-            <Text style={styles.infoCardVal}>1873</Text>
-            <Text style={styles.infoCardSub}>P. Penyengat, Riau</Text>
-          </View>
-        </View>
-
-        {/* Narrative Section */}
+        {/* Unified Profile & Bio Card */}
         <View style={styles.sectionCard}>
+          {/* Top Row: Photo + Quick Info */}
+          <View style={styles.profileHeaderRow}>
+            {/* Round Profile Photo */}
+            <View style={styles.profileFrame}>
+              <Image 
+                source={require('../assets/images/raja_ali_haji_profile.webp')} 
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            </View>
+
+            {/* Quick Metadata */}
+            <View style={styles.profileMeta}>
+              <Text style={styles.profileNameText}>Raja Ali Haji</Text>
+              <Text style={styles.profileTitleText}>
+                {language === 'en' ? 'Father of Indonesian Language' : 'Bapak Bahasa Indonesia'}
+              </Text>
+              
+              <View style={styles.metaInfoRow}>
+                <MaterialCommunityIcons name="calendar-star" size={14} color={colors.primary} />
+                <Text style={styles.metaInfoText}>
+                  {language === 'en' ? 'Born: 1808 (Selangor)' : 'Lahir: 1808 (Selangor)'}
+                </Text>
+              </View>
+
+              <View style={styles.metaInfoRow}>
+                <MaterialCommunityIcons name="calendar-remove" size={14} color={colors.primary} />
+                <Text style={styles.metaInfoText}>
+                  {language === 'en' ? 'Died: 1873 (P. Penyengat)' : 'Wafat: 1873 (P. Penyengat)'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Divider Line */}
+          <View style={styles.profileDivider} />
+
+          {/* Narrative Text */}
           <View style={styles.sectionHeaderRow}>
-            <Feather name="user" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+            <Feather name="user" size={16} color={colors.primary} style={{ marginRight: 6 }} />
             <Text style={styles.sectionTitle}>{language === 'en' ? 'Short Biography' : 'Riwayat Singkat'}</Text>
           </View>
           <Text style={styles.sectionBody}>
             {language === 'en' 
-              ? "Raja Ali Haji bin Raja Ahmad (1808–1873) was a 19th-century Bugis-Malay historian, poet, and scholar. He was born in Selangor but spent most of his productive life on the historic island of Pulau Penyengat in Riau. He was crowned as a National Hero of Indonesia in 2004 for his profound contributions to the Indonesian language and Malay literature."
+              ? "Raja Ali Haji bin Raja Ahmad (1808–1873) was a 19th-century Bugis-Malay historian, poet, and scholar. He spent most of his productive life on the historic island of Pulau Penyengat in Riau. He was crowned as a National Hero of Indonesia in 2004 for his profound contributions to the Indonesian language and Malay literature."
               : "Raja Ali Haji bin Raja Ahmad (1808–1873) adalah ulama, sejarawan, pujangga, dan tokoh intelektual Melayu-Bugis abad ke-19. Lahir di Selangor, beliau menghabiskan sebagian besar hidupnya di Pulau Penyengat, Kepulauan Riau. Beliau ditetapkan sebagai Pahlawan Nasional Indonesia pada tahun 2004 atas jasa-jasanya dalam merintis pembinaan bahasa Indonesia."}
           </Text>
         </View>
@@ -164,37 +221,60 @@ export default function RajaAliHajiScreen() {
 
   const renderTreeNode = (node: GenealogyNode, depth = 0) => {
     const isMainTokoh = node.name === "Raja Ali Haji";
+    const isExpanded = expandedNodes.includes(node.name);
 
     return (
       <View key={node.name} style={styles.treeNodeContainer}>
-        {/* Node Card */}
-        <Animated.View 
-          entering={SlideInRight.delay(depth * 100).duration(300)}
-          style={[
-            styles.treeCard,
-            isMainTokoh && styles.mainTokohCard,
-            { marginLeft: depth * 16 }
-          ]}
-        >
-          <View style={styles.treeCardHeader}>
+        {/* Row container holding the timeline circle and the card */}
+        <View style={styles.treeNodeRow}>
+          {/* Horizontal branch connector for child nodes */}
+          {depth > 0 && <View style={styles.connectorHorizontal} />}
+          
+          {/* Timeline Circle Node */}
+          <View style={[styles.timelineCircle, isMainTokoh && styles.timelineCircleMain]}>
             <MaterialCommunityIcons 
-              name={isMainTokoh ? "crown-outline" : "account-outline"} 
-              size={18} 
-              color={isMainTokoh ? "#fbbf24" : colors.primary} 
+              name={isMainTokoh ? "crown" : "account"} 
+              size={12} 
+              color={isMainTokoh ? "#fbbf24" : "#ffffff"} 
             />
-            <Text style={[styles.treeCardName, isMainTokoh && styles.mainTokohName]}>
-              {node.name}
-            </Text>
           </View>
-          {node.role && <Text style={styles.treeCardRole}>{node.role}</Text>}
-          <Text style={styles.treeCardRelation}>{node.relation}</Text>
-        </Animated.View>
 
-        {/* Render Children */}
+          {/* Node Card */}
+          <Animated.View 
+            entering={SlideInRight.delay(depth * 100).duration(300)}
+            style={[
+              styles.treeCard,
+              isMainTokoh && styles.mainTokohCard
+            ]}
+          >
+            <TouchableOpacity activeOpacity={0.75} onPress={() => toggleNode(node.name)}>
+              <View style={styles.treeCardHeader}>
+                <Text style={[styles.treeCardName, isMainTokoh && styles.mainTokohName, { flex: 1 }]}>
+                  {node.name}
+                </Text>
+                <Feather 
+                  name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                  size={16} 
+                  color={colors.textSecondary} 
+                />
+              </View>
+              {node.role && <Text style={styles.treeCardRole}>{node.role}</Text>}
+              <Text style={styles.treeCardRelation}>{node.relation}</Text>
+
+              {/* Expandable Bio */}
+              {isExpanded && node.bio && (
+                <View style={styles.treeCardBioWrap}>
+                  <View style={styles.treeCardBioDivider} />
+                  <Text style={styles.treeCardBioText}>{node.bio}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+
+        {/* Render Children inside a wrapper with a left border line */}
         {node.children && node.children.map((child) => (
           <View key={child.name} style={styles.childrenWrapper}>
-            {/* Connector Line */}
-            <View style={[styles.connectorLine, { left: (depth * 16) + 24 }]} />
             {renderTreeNode(child, depth + 1)}
           </View>
         ))}
@@ -219,7 +299,7 @@ export default function RajaAliHajiScreen() {
         {/* Hero Section */}
         <View style={styles.heroWrapper}>
           <Image 
-            source={require('../assets/images/masjid_penyengat_1776493242751.jpg')} 
+            source={require('../assets/images/sampulbiografi.webp')} 
             style={styles.heroBg} 
             resizeMode="cover"
           />
@@ -488,16 +568,44 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     position: 'relative',
   },
   treeNodeContainer: {
+    marginBottom: 6,
+  },
+  treeNodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     position: 'relative',
-    marginBottom: 16,
+  },
+  timelineCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+  },
+  timelineCircleMain: {
+    backgroundColor: '#fbbf24',
+    shadowColor: '#fbbf24',
   },
   treeCard: {
     backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    width: '90%',
+    marginLeft: 12,
+    flex: 1,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.2 : 0.04,
+    shadowRadius: 4,
   },
   mainTokohCard: {
     borderColor: '#fbbf24',
@@ -513,7 +621,6 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.text,
-    marginLeft: 6,
   },
   mainTokohName: {
     color: isDark ? '#fbbf24' : '#b45309',
@@ -530,15 +637,88 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 4,
   },
-  childrenWrapper: {
-    position: 'relative',
-    paddingTop: 16,
+  treeCardBioWrap: {
+    marginTop: 10,
   },
-  connectorLine: {
+  treeCardBioDivider: {
+    height: 1,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    marginBottom: 10,
+  },
+  treeCardBioText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    textAlign: 'justify',
+  },
+  childrenWrapper: {
+    borderLeftWidth: 1.5,
+    borderLeftColor: colors.border,
+    marginLeft: 10,
+    paddingLeft: 12,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  connectorHorizontal: {
     position: 'absolute',
-    top: -16,
-    bottom: 16,
-    width: 2,
+    left: -12,
+    top: 11,
+    width: 12,
+    height: 1.5,
     backgroundColor: colors.border,
+  },
+  profileHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  profileFrame: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#fbbf24',
+    overflow: 'hidden',
+    backgroundColor: colors.card,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  profileMeta: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  profileNameText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  profileTitleText: {
+    fontSize: 11,
+    color: '#fbbf24',
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  metaInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  metaInfoText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  profileDivider: {
+    height: 1,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    marginVertical: 14,
   },
 });

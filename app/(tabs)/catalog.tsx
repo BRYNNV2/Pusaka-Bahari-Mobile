@@ -63,7 +63,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
   'Tradisi': { bg: '#f5f3ff', text: '#8b5cf6', icon: 'anchor' },
 };
 
-const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.jpg');
+const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.webp');
 
 const PAGE_SIZE = 20;
 

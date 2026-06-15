@@ -15,6 +15,7 @@ import {
   StatusBar,
   Image,
   Dimensions,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -25,7 +26,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import MapView, { Marker, MapPressEvent, UrlTile } from 'react-native-maps';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -127,9 +129,127 @@ export default function AdminPanel() {
   const [bFileType, setBFileType] = useState('pdf');
   const [uploadingBCover, setUploadingBCover] = useState(false);
   const [uploadingBFile, setUploadingBFile] = useState(false);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [tempLat, setTempLat] = useState<number | null>(null);
+  const [tempLng, setTempLng] = useState<number | null>(null);
+  const [initialMapCoords, setInitialMapCoords] = useState<{ lat: number | null, lng: number | null }>({ lat: null, lng: null });
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const currentTab = TABS.find(t => t.id === activeTab)!;
+
+  const generateMapPickerHtml = (lat: number | null, lng: number | null) => {
+    const tileUrl = 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png';
+    const primaryColor = colors.primary || '#8b5e3c';
+    const initialLat = lat ?? 0.9255;
+    const initialLng = lng ?? 104.4170;
+    const hasMarker = lat !== null && lng !== null;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          body { margin: 0; padding: 0; }
+          #map { height: 100vh; width: 100vw; background: #f8fafc; }
+          .custom-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(139, 94, 60, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .marker-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: ${primaryColor};
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+          }
+          .leaflet-control-attribution { display: none !important; }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          const map = L.map('map', {
+            zoomControl: true,
+            scrollWheelZoom: true,
+            touchZoom: true,
+            dragging: true,
+            attributionControl: false
+          }).setView([${initialLat}, ${initialLng}], 14);
+
+          L.tileLayer('${tileUrl}', {
+            maxZoom: 19
+          }).addTo(map);
+
+          let currentMarker = null;
+
+          const customIcon = L.divIcon({
+            className: '',
+            html: '<div class="custom-marker"><div class="marker-dot"></div></div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          });
+
+          if (${hasMarker}) {
+            currentMarker = L.marker([${initialLat}, ${initialLng}], { icon: customIcon }).addTo(map);
+          }
+
+          map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+
+            if (currentMarker) {
+              currentMarker.setLatLng([lat, lng]);
+            } else {
+              currentMarker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+            }
+
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'PICK_LOCATION',
+              lat: lat,
+              lng: lng
+            }));
+          });
+
+          // Send touch start/end events to disable parent ScrollView scrolling
+          document.addEventListener('touchstart', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'TOUCH_START' }));
+          }, { passive: true });
+          document.addEventListener('touchend', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'TOUCH_END' }));
+          }, { passive: true });
+          document.addEventListener('touchcancel', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'TOUCH_END' }));
+          }, { passive: true });
+        </script>
+      </body>
+      </html>
+    `;
+  };
+
+  const convertToWebP = async (uri: string): Promise<string> => {
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1080 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.WEBP }
+      );
+      return manipResult.uri;
+    } catch (e) {
+      console.warn('Gagal konversi ke WebP, menggunakan file asli:', e);
+      return uri;
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (activeTab === 'dashboard') {
@@ -179,14 +299,14 @@ export default function AdminPanel() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: true,
-        quality: 0.7,
+        quality: 0.8,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
       if (result.canceled || !result.assets[0]) return;
 
-      const uri = result.assets[0].uri;
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      setPendingGalleryItem({ uri, type: 'image', ext, title: '', desc: '', lyrics: '' });
+      const originalUri = result.assets[0].uri;
+      const webpUri = await convertToWebP(originalUri);
+      setPendingGalleryItem({ uri: webpUri, type: 'image', ext: 'webp', title: '', desc: '', lyrics: '' });
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -279,11 +399,12 @@ export default function AdminPanel() {
       if (status !== 'granted') return Alert.alert('Izin Ditolak', 'Butuh izin akses galeri foto.');
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: true,
-        quality: 0.7,
+        quality: 0.8,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
       if (result.canceled || !result.assets[0]) return;
-      setEditingGalleryItem({ ...editingGalleryItem, newImageUri: result.assets[0].uri });
+      const webpUri = await convertToWebP(result.assets[0].uri);
+      setEditingGalleryItem({ ...editingGalleryItem, newImageUri: webpUri });
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -335,6 +456,11 @@ export default function AdminPanel() {
   // ── Form ─────────────────────────────────────────────────────────────────────
   const resetForm = () => {
     setAType('Artefak'); setAName(''); setAYear(''); setADesc(''); setAOpenHours(''); setAImageUri(null); setAImageUrl(null); setALat(null); setALng(null);
+    setScrollEnabled(true);
+    setMapModalVisible(false);
+    setTempLat(null);
+    setTempLng(null);
+    setInitialMapCoords({ lat: null, lng: null });
     setArtifactGallery([]);
     setCType('Benda'); setCName(''); setCYear(''); setCLocation(''); setCDesc(''); setCImageUri(null); setCImageUrl(null);
     setGTitle(''); setGDesc(''); setGAudio(''); setGOrder('0'); setGImageUri(null); setGImageUrl(null); setGLyrics(''); setGVideoUrl(''); setGMediaType('photo');
@@ -353,7 +479,10 @@ export default function AdminPanel() {
       setAYear(item.year ?? '');       setADesc(item.description ?? '');
       setAOpenHours(item.operational_hours ?? '');
       setAImageUri(item.image_url ?? null); setAImageUrl(item.image_url ?? null);
-      setALat(item.latitude ?? null); setALng(item.longitude ?? null);
+      const latVal = item.latitude !== null && item.latitude !== undefined ? parseFloat(String(item.latitude)) : null;
+      const lngVal = item.longitude !== null && item.longitude !== undefined ? parseFloat(String(item.longitude)) : null;
+      setALat(latVal === null || isNaN(latVal) ? null : latVal);
+      setALng(lngVal === null || isNaN(lngVal) ? null : lngVal);
       fetchArtifactGallery(item.id);
     } else if (activeTab === 'catalogs') {
       setCType(item.type ?? 'Benda'); setCName(item.name ?? '');
@@ -456,20 +585,21 @@ export default function AdminPanel() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: true,
-        quality: 0.7,
+        quality: 0.8,
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
 
       if (result.canceled || !result.assets[0]) return;
-      const uri = result.assets[0].uri;
-      setUri(uri);
+      const originalUri = result.assets[0].uri;
       setUploading(true);
+      const webpUri = await convertToWebP(originalUri);
+      setUri(webpUri);
 
-      const ext  = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const ext  = 'webp';
       const path = `${folder}/${Date.now()}.${ext}`;
       const formData = new FormData();
       formData.append('files', {
-        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        uri: Platform.OS === 'ios' ? webpUri.replace('file://', '') : webpUri,
         name: `upload_${Date.now()}.${ext}`,
         type: `image/${ext}`,
       } as any);
@@ -762,42 +892,23 @@ export default function AdminPanel() {
 
         {/* ── Map Picker untuk Koordinat ── */}
         <Text style={styles.formLabel}>Lokasi di Peta</Text>
-        <Text style={styles.mapPickerHint}>
-          <Ionicons name="information-circle-outline" size={13} color={colors.textSecondary} />
-          {' '}Ketuk pada peta untuk menandai lokasi artefak
-        </Text>
-        <View style={styles.mapPickerContainer}>
-          <MapView
-            style={styles.mapPickerMap}
-            initialRegion={{
-              latitude: aLat ?? 0.9255,
-              longitude: aLng ?? 104.4170,
-              latitudeDelta: 0.012,
-              longitudeDelta: 0.012,
-            }}
-            onPress={(e: MapPressEvent) => {
-              const { latitude, longitude } = e.nativeEvent.coordinate;
-              setALat(latitude);
-              setALng(longitude);
-            }}
-            mapType={Platform.OS === 'android' ? 'none' : 'standard'}
-          >
-            {Platform.OS === 'android' && (
-              <UrlTile
-                urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-                maximumZ={19}
-                flipY={false}
-              />
-            )}
-            {aLat !== null && aLng !== null && (
-              <Marker coordinate={{ latitude: aLat, longitude: aLng }}>
-                <View style={styles.mapPickerMarker}>
-                  <View style={styles.mapPickerMarkerDot} />
-                </View>
-              </Marker>
-            )}
-          </MapView>
-        </View>
+        <TouchableOpacity
+          style={styles.mapOpenButton}
+          onPress={() => {
+            Keyboard.dismiss();
+            setInitialMapCoords({ lat: aLat, lng: aLng });
+            setTempLat(aLat);
+            setTempLng(aLng);
+            setMapModalVisible(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="map-outline" size={20} color={colors.primary} />
+          <Text style={styles.mapOpenButtonText}>
+            {aLat !== null && aLng !== null ? 'Ubah Lokasi di Peta' : 'Pilih Lokasi di Peta'}
+          </Text>
+        </TouchableOpacity>
+
         {aLat !== null && aLng !== null ? (
           <View style={styles.coordResult}>
             <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
@@ -1456,7 +1567,7 @@ export default function AdminPanel() {
       <Modal
         visible={modalVisible}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="overFullScreen"
         onRequestClose={() => { setModalVisible(false); resetForm(); }}
       >
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1473,7 +1584,12 @@ export default function AdminPanel() {
             </View>
 
             {/* Modal Form */}
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView 
+              style={styles.modalBody} 
+              showsVerticalScrollIndicator={false} 
+              keyboardShouldPersistTaps="handled"
+              scrollEnabled={scrollEnabled && !mapModalVisible}
+            >
               {renderForm()}
               <View style={{ height: 32 }} />
             </ScrollView>
@@ -1494,6 +1610,68 @@ export default function AdminPanel() {
                 }
               </TouchableOpacity>
             </View>
+
+            {/* ── Map Picker Overlay (rendered inside the same Modal to avoid multi-modal gesture block) ── */}
+            {mapModalVisible && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card, zIndex: 999 }]}>
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalTitle}>Tandai Lokasi</Text>
+                    <Text style={styles.modalSub} numberOfLines={1}>Ketuk peta untuk menandai koordinat artefak</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setMapModalVisible(false)} style={styles.modalClose}>
+                    <Feather name="x" size={22} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Full Screen Map Picker */}
+                <View style={{ flex: 1, backgroundColor: colors.border }}>
+                  <WebView
+                    style={{ flex: 1 }}
+                    originWhitelist={['*']}
+                    source={{ html: generateMapPickerHtml(initialMapCoords.lat, initialMapCoords.lng) }}
+                    onMessage={(event) => {
+                      try {
+                        const data = JSON.parse(event.nativeEvent.data);
+                        if (data.type === 'PICK_LOCATION') {
+                          setTempLat(data.lat);
+                          setTempLng(data.lng);
+                        }
+                      } catch (err) {
+                        console.log('Error picking location:', err);
+                      }
+                    }}
+                    domStorageEnabled={true}
+                    javaScriptEnabled={true}
+                  />
+                </View>
+
+                {/* Map Modal Footer */}
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity 
+                    style={styles.cancelBtn} 
+                    onPress={() => setMapModalVisible(false)}
+                  >
+                    <Text style={styles.cancelText}>Batal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.saveBtn, 
+                      (tempLat === null || tempLng === null) && styles.saveBtnOff
+                    ]}
+                    onPress={() => {
+                      setALat(tempLat);
+                      setALng(tempLng);
+                      setMapModalVisible(false);
+                    }}
+                    disabled={tempLat === null || tempLng === null}
+                  >
+                    <Text style={styles.saveBtnText}>Konfirmasi Lokasi</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
@@ -1607,6 +1785,23 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   mapPickerMarkerDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.primary, borderWidth: 2, borderColor: "#ffffff" },
   coordResult: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, backgroundColor: '#f0fdf4', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0' },
   coordResultText: { flex: 1, fontSize: 13, fontWeight: '600', color: '#166534' },
+  mapOpenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 12,
+    height: 52,
+    marginTop: 4,
+  },
+  mapOpenButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
 
   // Artifact Gallery Management
   gallerySectionDivider: { height: 1, backgroundColor: colors.border, marginTop: 24, marginBottom: 8 },

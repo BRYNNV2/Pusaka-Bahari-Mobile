@@ -25,9 +25,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 280;
 
 const HERO_IMAGES = [
-  require('../../assets/images/pusaka_bahari_banner_1776493187345.jpg'),
-  require('../../assets/images/masjid_penyengat_1776493242751.jpg'),
-  require('../../assets/images/naskah_gurindam_1776493215711.jpg'),
+  require('../../assets/images/pusaka_bahari_banner_1776493187345.webp'),
+  require('../../assets/images/masjid_penyengat_1776493242751.webp'),
+  require('../../assets/images/naskah_gurindam_1776493215711.webp'),
 ];
 
 export default function HomeScreen() {
@@ -64,6 +64,7 @@ export default function HomeScreen() {
     Benda: { lib: 'feather', name: 'box' },
   };
   const [activeCategory, setActiveCategory] = useState('Semua');
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const [artifactsData, setArtifactsData] = useState<any[]>([]);
   const [loadingContent, setLoadingContent] = useState(true);
@@ -74,22 +75,13 @@ export default function HomeScreen() {
 
   const [agendaData, setAgendaData] = useState<any[]>([]);
   const [showAgendaModal, setShowAgendaModal] = useState(false);
-  const [showFloatingAgenda, setShowFloatingAgenda] = useState(false);
-  const floatingAnim = useRef(new Animated.Value(0)).current;
+  const [showSideDrawer, setShowSideDrawer] = useState(false);
+  const sideDrawerAnim = useRef(new Animated.Value(0)).current;
   const hasShownAgendaModal = useRef(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [weatherData, setWeatherData] = useState<any>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatingAnim, { toValue: -8, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
-        Animated.timing(floatingAnim, { toValue: 0, duration: 1500, useNativeDriver: true, easing: Easing.inOut(Easing.ease) })
-      ])
-    ).start();
-  }, []);
 
   const fetchUnreadCount = async () => {
     try {
@@ -388,16 +380,11 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <ScrollView 
-          bounces={true} 
-          showsVerticalScrollIndicator={false} 
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
-          }
-        >
-          
-          {/* 1. Header Row */}
+        {/* 1. Header Row (Sticky at the top) */}
+        <View style={[
+          styles.headerContainer,
+          isScrolled && styles.headerContainerScrolled
+        ]}>
           <View style={styles.headerRow}>
             <View style={styles.greetingGroup}>
               <Text style={styles.greetingTime}>
@@ -474,7 +461,21 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           </View>
- 
+        </View>
+
+        <ScrollView 
+          bounces={true} 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+          onScroll={(event) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            setIsScrolled(offsetY > 10);
+          }}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+          }
+        >
           {/* Offline Mode Banner */}
           {isOffline && (
             <View style={styles.offlineBanner}>
@@ -717,7 +718,7 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/artifact/${item.id}` as any)}
                 >
                   <Image 
-                    source={item.image_url ? { uri: item.image_url } : require('../../assets/images/naskah_gurindam_1776493215711.jpg')} 
+                    source={item.image_url ? { uri: item.image_url } : require('../../assets/images/naskah_gurindam_1776493215711.webp')} 
                     style={styles.cardImage} 
                     resizeMode="cover" 
                   />
@@ -763,7 +764,6 @@ export default function HomeScreen() {
         animationType="fade"
         onRequestClose={() => {
           setShowAgendaModal(false);
-          setShowFloatingAgenda(true);
         }}
       >
         <View style={styles.modalOverlayPremium}>
@@ -791,7 +791,6 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   onPress={() => {
                     setShowAgendaModal(false);
-                    setShowFloatingAgenda(true);
                   }} 
                   style={styles.posterCloseBtn}
                 >
@@ -835,47 +834,82 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* Pure 3D Floating Icon */}
-      {showFloatingAgenda && agendaData.length > 0 && (
-        <Animated.View style={[styles.floatingWidgetContainer, { transform: [{ translateY: floatingAnim }] }]}>
-          <TouchableOpacity 
-            activeOpacity={0.8}
-            onPress={() => router.push('/agenda')}
-            style={styles.floatingWidgetGraphicOnly}
+      {/* Side Drawer Tab */}
+      <View style={styles.sideDrawerWrapper}>
+        {/* Animated Drawer Panel */}
+        <Animated.View style={[
+          styles.sideDrawerPanel,
+          {
+            opacity: sideDrawerAnim,
+            transform: [
+              { translateX: sideDrawerAnim.interpolate({ inputRange: [0, 1], outputRange: [80, 0] }) },
+              { scale: sideDrawerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }
+            ],
+          }
+        ]}>
+          {/* Menu Item 1: Biografi */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.sideDrawerItem}
+            onPress={() => {
+              Animated.spring(sideDrawerAnim, { toValue: 0, useNativeDriver: true, friction: 8 }).start(() => {
+                setShowSideDrawer(false);
+                router.push('/raja-ali-haji');
+              });
+            }}
           >
-            <Image 
-              source={require('../../assets/images/keris_calendar_nobg_v2.png')} 
-              style={styles.floatingWidgetImgTrans} 
-              resizeMode="contain" 
-            />
-            
-            <TouchableOpacity onPress={() => setShowFloatingAgenda(false)} style={styles.floatingWidgetClose}>
-              <Feather name="x" size={12} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={styles.sideDrawerDot}>
+              <MaterialCommunityIcons name="crown-outline" size={10} color="#ffffff" />
+            </View>
+            <View>
+              <Text style={styles.sideDrawerLabel}>{language === 'en' ? 'Biography' : 'Biografi'}</Text>
+              <Text style={styles.sideDrawerSub}>Raja Ali Haji</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Connector Line */}
+          <View style={styles.sideDrawerConnector} />
+
+          {/* Menu Item 2: Agenda */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.sideDrawerItem}
+            onPress={() => {
+              Animated.spring(sideDrawerAnim, { toValue: 0, useNativeDriver: true, friction: 8 }).start(() => {
+                setShowSideDrawer(false);
+                router.push('/agenda');
+              });
+            }}
+          >
+            <View style={styles.sideDrawerDot}>
+              <Feather name="calendar" size={10} color="#ffffff" />
+            </View>
+            <View>
+              <Text style={styles.sideDrawerLabel}>{language === 'en' ? 'Event Agenda' : 'Agenda Acara'}</Text>
+              <Text style={styles.sideDrawerSub}>{language === 'en' ? 'Upcoming' : 'Mendatang'}</Text>
+            </View>
           </TouchableOpacity>
         </Animated.View>
-      )}
 
-      {/* Permanent Premium Floating FAB for Raja Ali Haji (Biografi & Silsilah) */}
-      <View 
-        style={[
-          styles.floatingBioFABContainer, 
-          { 
-            bottom: (showFloatingAgenda && agendaData.length > 0) ? 134 : 24
-          }
-        ]}
-      >
-        <TouchableOpacity 
+        {/* Pull Tab Handle */}
+        <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => router.push('/raja-ali-haji')}
-          style={styles.floatingBioFABBtn}
+          style={[
+            styles.sideDrawerHandle,
+            showSideDrawer && styles.sideDrawerHandleActive
+          ]}
+          onPress={() => {
+            if (showSideDrawer) {
+              Animated.spring(sideDrawerAnim, { toValue: 0, useNativeDriver: true, friction: 8 }).start(() => setShowSideDrawer(false));
+            } else {
+              setShowSideDrawer(true);
+              Animated.spring(sideDrawerAnim, { toValue: 1, useNativeDriver: true, friction: 6, tension: 50 }).start();
+            }
+          }}
         >
-          <LinearGradient
-            colors={isDark ? ['#d4af37', '#856404'] : ['#f59e0b', '#d97706']}
-            style={styles.floatingBioFABGradient}
-          >
-            <MaterialCommunityIcons name="crown" size={24} color="#ffffff" />
-          </LinearGradient>
+          <Animated.View style={{ transform: [{ rotate: sideDrawerAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
+            <Feather name="chevron-left" size={16} color="#ffffff" />
+          </Animated.View>
         </TouchableOpacity>
       </View>
 
@@ -893,14 +927,30 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 12 : 0,
-    paddingBottom: 20, // Reduced from 90 because tab bar is not absolute
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+  headerContainer: {
+    backgroundColor: colors.background,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 12 : 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent',
+    zIndex: 1000,
+  },
+  headerContainerScrolled: {
+    borderBottomColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.35 : 0.05,
+    shadowRadius: 4,
+    elevation: 3,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
   },
   greetingGroup: {
     flex: 1,
@@ -1401,8 +1451,8 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   floatingWidgetGraphicOnly: {
     position: 'relative',
-    width: 100,
-    height: 100,
+    width: 75,
+    height: 75,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1675,31 +1725,88 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     marginLeft: 4,
     fontWeight: '500',
   },
-  floatingBioFABContainer: {
+  sideDrawerWrapper: {
     position: 'absolute',
-    right: 20,
-    zIndex: 998,
-    elevation: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-  },
-  floatingBioFABBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    overflow: 'hidden',
-    justifyContent: 'center',
+    right: 0,
+    bottom: 110,
+    zIndex: 999,
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  floatingBioFABGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+  sideDrawerPanel: {
+    backgroundColor: isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginRight: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: isDark ? 'rgba(212,175,55,0.15)' : 'rgba(212,175,55,0.2)',
+    elevation: 16,
+    shadowColor: isDark ? '#000' : 'rgba(212,175,55,0.3)',
+    shadowOffset: { width: -6, height: 6 },
+    shadowOpacity: isDark ? 0.5 : 0.2,
+    shadowRadius: 16,
+    alignItems: 'flex-start',
+  },
+  sideDrawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    paddingRight: 12,
+  },
+  sideDrawerDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+  },
+  sideDrawerLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: 0.2,
+  },
+  sideDrawerSub: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 1,
+    fontWeight: '500',
+  },
+  sideDrawerConnector: {
+    width: 2,
+    height: 12,
+    backgroundColor: colors.primary,
+    marginLeft: 14,
+    borderRadius: 1,
+    opacity: 0.35,
+  },
+  sideDrawerHandle: {
+    width: 24,
+    height: 52,
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : colors.primary,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: -3, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderRightWidth: 0,
+    borderColor: isDark ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.3)',
+  },
+  sideDrawerHandleActive: {
+    backgroundColor: isDark ? colors.primary : '#b45309',
   }
 });

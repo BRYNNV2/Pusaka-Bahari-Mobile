@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
-const FALLBACK_IMAGE = require('../assets/images/naskah_gurindam_1776493215711.jpg');
+const FALLBACK_IMAGE = require('../assets/images/naskah_gurindam_1776493215711.webp');
 
 export default function LikesScreen() {
   const { isDark, colors } = useTheme();

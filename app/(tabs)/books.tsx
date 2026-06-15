@@ -24,7 +24,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2;
 
-const FALLBACK_COVER = require('../../assets/images/naskah_gurindam_1776493215711.jpg');
+const FALLBACK_COVER = require('../../assets/images/naskah_gurindam_1776493215711.webp');
 
 type BookItem = {
   id: number;
@@ -156,7 +156,7 @@ export default function BooksScreen() {
       {/* New Rich Hero Section */}
       <View style={styles.heroSection}>
         <Image 
-          source={require('../../assets/images/naskah_gurindam_1776493215711.jpg')}
+          source={require('../../assets/images/naskah_gurindam_1776493215711.webp')}
           style={StyleSheet.absoluteFillObject}
         />
         <LinearGradient 

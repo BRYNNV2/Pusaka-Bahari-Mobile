@@ -107,15 +107,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const admin = await checkAdminStatus(session.user.id);
-        setIsAdmin(admin);
+    const initSession = async () => {
+      const fetchPromise = supabase.auth.getSession().then(async ({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const admin = await checkAdminStatus(session.user.id);
+          setIsAdmin(admin);
+        }
+        return true;
+      });
+
+      const timeoutPromise = new Promise<boolean>((resolve) =>
+        setTimeout(() => resolve(false), 2500)
+      );
+
+      try {
+        await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (e) {
+        console.warn('Initial session fetch error:', e);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
+
+    initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);

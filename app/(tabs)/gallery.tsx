@@ -26,7 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
-const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.jpg');
+const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.webp');
 
 export default function GalleryScreen() {
   const { mode, isDark, colors } = useTheme();

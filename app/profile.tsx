@@ -169,13 +169,26 @@ export default function ProfileScreen() {
     
     setLoadingPass(true);
     try {
-      const { error: loginError } = await supabase.auth.signInWithPassword({
+      // Buat temporary client tanpa persistSession agar tidak menabrak atau menimpa session utama app
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        }
+      });
+
+      const { error: loginError } = await tempClient.auth.signInWithPassword({
         email: user?.email!,
         password: oldPassword,
       });
 
       if (loginError) throw new Error('Kata sandi lama tidak sesuai.');
 
+      // Update password di client utama aplikasi
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
 
@@ -294,7 +307,7 @@ export default function ProfileScreen() {
         {/* Curved Header Background with Faded Image */}
         <View style={styles.headerBackground}>
           <Image 
-            source={require('../assets/images/masjid_penyengat_1776493242751.jpg')}
+            source={require('../assets/images/masjid_penyengat_1776493242751.webp')}
             style={{ 
               width: width, 
               height: height * 0.23, 

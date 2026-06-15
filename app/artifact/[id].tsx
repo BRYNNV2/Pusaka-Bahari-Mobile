@@ -50,9 +50,9 @@ const TYPE_ICON: Record<string, string> = {
   Benda:   'box',
 };
 
-const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.jpg');
-const FALLBACK_IMAGE2 = require('../../assets/images/masjid_penyengat_1776493242751.jpg');
-const FALLBACK_IMAGE3 = require('../../assets/images/pusaka_bahari_banner_1776493187345.jpg');
+const FALLBACK_IMAGE = require('../../assets/images/naskah_gurindam_1776493215711.webp');
+const FALLBACK_IMAGE2 = require('../../assets/images/masjid_penyengat_1776493242751.webp');
+const FALLBACK_IMAGE3 = require('../../assets/images/pusaka_bahari_banner_1776493187345.webp');
 
 export default function ArtifactDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -157,6 +157,38 @@ export default function ArtifactDetailScreen() {
   // Audio Tour Guide (Speech TTS) State
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSpeechPaused, setIsSpeechPaused] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<string | undefined>(undefined);
+
+  // Cari suara Charon / Suara kualitas tinggi secara dinamis
+  useEffect(() => {
+    const loadVoices = async () => {
+      try {
+        const voices = await Speech.getAvailableVoicesAsync();
+        // Cari suara yang memiliki nama mengandung 'charon'
+        const charonVoice = voices.find((v: Speech.Voice) => 
+          v.name.toLowerCase().includes('charon') || 
+          v.identifier.toLowerCase().includes('charon')
+        );
+
+        if (charonVoice) {
+          setSelectedVoice(charonVoice.identifier);
+        } else {
+          // Fallback ke suara enhanced default berdasarkan bahasa
+          const langTag = language === 'en' ? 'en' : 'id';
+          const bestVoice = voices.find((v: Speech.Voice) => 
+            v.language.toLowerCase().startsWith(langTag) && 
+            (v.quality === 'Enhanced' || v.name.toLowerCase().includes('enhanced') || v.name.toLowerCase().includes('premium'))
+          );
+          if (bestVoice) {
+            setSelectedVoice(bestVoice.identifier);
+          }
+        }
+      } catch (e) {
+        console.warn('Error loading TTS voices:', e);
+      }
+    };
+    loadVoices();
+  }, [language]);
 
   const startSpeech = () => {
     if (!artifact?.description) return;
@@ -168,6 +200,7 @@ export default function ArtifactDetailScreen() {
       
     Speech.speak(cleanText, {
       language: language === 'en' ? 'en-US' : 'id-ID',
+      voice: selectedVoice,
       pitch: 1.0,
       rate: 0.9,
       onStart: () => {
