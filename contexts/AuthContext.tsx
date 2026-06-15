@@ -133,12 +133,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const admin = await checkAdminStatus(session.user.id);
-        setIsAdmin(admin);
+        checkAdminStatus(session.user.id).then((admin) => {
+          setIsAdmin(admin);
+        }).catch((err) => {
+          console.warn('Failed to check admin status:', err);
+        });
       } else {
         setIsAdmin(false);
       }

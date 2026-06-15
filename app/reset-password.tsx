@@ -33,9 +33,20 @@ export default function ResetPasswordScreen() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert('Sesi Kadaluarsa', 'Sesi ubah kata sandi tidak ditemukan atau telah kadaluarsa. Silakan minta tautan baru dari menu Lupa Kata Sandi.');
+        setIsLoading(false);
+        return;
+      }
+
+      const updatePromise = supabase.auth.updateUser({ password: password });
+      const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
+        setTimeout(() => reject(new Error('Koneksi timeout saat mengubah kata sandi, silakan coba lagi')), 10000)
+      );
+
+      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any;
+
       if (error) {
         Alert.alert(t('resetFailTitle'), error.message);
       } else {
