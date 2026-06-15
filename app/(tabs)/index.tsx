@@ -464,6 +464,7 @@ export default function HomeScreen() {
         </View>
 
         <ScrollView 
+          style={{ flex: 1 }}
           bounces={true} 
           showsVerticalScrollIndicator={false} 
           contentContainerStyle={styles.scrollContent}
