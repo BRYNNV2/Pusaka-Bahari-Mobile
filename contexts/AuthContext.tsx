@@ -32,12 +32,37 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 const checkAdminStatus = async (userId: string): Promise<boolean> => {
-  const { data } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', userId)
-    .single();
-  return data?.is_admin ?? false;
+  const fetchPromise = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .single();
+      if (error) return { status: 'error', value: false };
+      return { status: 'success', value: data?.is_admin ?? false };
+    } catch {
+      return { status: 'error', value: false };
+    }
+  })();
+
+  const timeoutPromise = new Promise<{ status: string; value: boolean }>((resolve) =>
+    setTimeout(() => resolve({ status: 'timeout', value: false }), 3500)
+  );
+
+  try {
+    const result = await Promise.race([fetchPromise, timeoutPromise]);
+    if (result.status === 'success') {
+      await AsyncStorage.setItem(`@is_admin_${userId}`, String(result.value));
+      return result.value;
+    } else {
+      const cached = await AsyncStorage.getItem(`@is_admin_${userId}`);
+      return cached === 'true';
+    }
+  } catch (e) {
+    const cached = await AsyncStorage.getItem(`@is_admin_${userId}`);
+    return cached === 'true';
+  }
 };
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {

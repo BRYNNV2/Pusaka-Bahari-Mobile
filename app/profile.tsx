@@ -114,12 +114,14 @@ export default function ProfileScreen() {
     };
   });
 
-  const fetchProfile = async () => {
+  const fetchProfile = async (showFullscreenLoader = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (showFullscreenLoader) {
+      setLoading(true);
+    }
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       if (error && error.code !== 'PGRST116') { // PGRST116 is code for no rows returned, which is fine for new users
@@ -138,7 +140,9 @@ export default function ProfileScreen() {
     }
   };
 
-  useEffect(() => { fetchProfile(); }, [user]);
+  useEffect(() => { 
+    fetchProfile(!profile); 
+  }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
