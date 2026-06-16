@@ -23,6 +23,22 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const customLayoutSpring = {
+  duration: 400,
+  create: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
+  update: {
+    type: LayoutAnimation.Types.spring,
+    springDamping: 0.75,
+  },
+  delete: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
+};
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -239,7 +255,7 @@ export default function CatalogScreen() {
               <TouchableOpacity 
                 style={[styles.categoryPill, isActive && styles.categoryPillActive]}
                 onPress={() => {
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  LayoutAnimation.configureNext(customLayoutSpring);
                   setActiveCategory(item);
                 }}
               >

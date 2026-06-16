@@ -14,6 +14,22 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const customLayoutSpring = {
+  duration: 400,
+  create: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
+  update: {
+    type: LayoutAnimation.Types.spring,
+    springDamping: 0.75,
+  },
+  delete: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
+};
+
 const { width } = Dimensions.get('window');
 const FALLBACK_IMAGE = require('../assets/images/naskah_gurindam_1776493215711.webp');
 
@@ -182,7 +198,7 @@ export default function CollectionsScreen() {
                  key={tab}
                  style={[styles.categoryPill, isActive ? styles.categoryPillActive : { backgroundColor: colors.border }]}
                  onPress={() => {
-                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                   LayoutAnimation.configureNext(customLayoutSpring);
                    setActiveTab(tab);
                  }}
                  activeOpacity={0.8}

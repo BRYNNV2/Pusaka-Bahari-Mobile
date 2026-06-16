@@ -9,6 +9,23 @@ import { ScrollView, StatusBar, StyleSheet, Text,
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+
+const customLayoutSpring = {
+  duration: 400,
+  create: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
+  update: {
+    type: LayoutAnimation.Types.spring,
+    springDamping: 0.75,
+  },
+  delete: {
+    type: LayoutAnimation.Types.easeInEaseOut,
+    property: LayoutAnimation.Properties.opacity,
+  },
+};
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -584,7 +601,7 @@ export default function GalleryScreen() {
           <TouchableOpacity
             style={[styles.tabPill, galleryTab === 'playlist' && styles.tabPillActive]}
             onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              LayoutAnimation.configureNext(customLayoutSpring);
               setGalleryTab('playlist');
             }}
             activeOpacity={0.8}
@@ -600,7 +617,7 @@ export default function GalleryScreen() {
           <TouchableOpacity
             style={[styles.tabPill, galleryTab === 'visual' && styles.tabPillActive]}
             onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              LayoutAnimation.configureNext(customLayoutSpring);
               setGalleryTab('visual');
             }}
             activeOpacity={0.8}
