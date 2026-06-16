@@ -177,6 +177,7 @@ export default function GalleryScreen() {
     } catch (e) {}
   };
   const [searchQuery, setSearchQuery] = useState('');
+  const [galleryTab, setGalleryTab] = useState<'playlist' | 'visual'>('playlist');
 
   const GALLERY_PAGE_SIZE = 15;
 
@@ -577,6 +578,36 @@ export default function GalleryScreen() {
             )}
           </View>
         </View>
+
+        {/* Tab Switcher */}
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            style={[styles.tabPill, galleryTab === 'playlist' && styles.tabPillActive]}
+            onPress={() => setGalleryTab('playlist')}
+            activeOpacity={0.8}
+          >
+            <Feather name="music" size={14} color={galleryTab === 'playlist' ? colors.background : colors.textSecondary} />
+            <Text style={[styles.tabPillText, galleryTab === 'playlist' && styles.tabPillTextActive]}>
+              {t('playlist')}
+            </Text>
+            <View style={[styles.tabBadge, galleryTab === 'playlist' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, galleryTab === 'playlist' && styles.tabBadgeTextActive]}>{playlist.length}</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabPill, galleryTab === 'visual' && styles.tabPillActive]}
+            onPress={() => setGalleryTab('visual')}
+            activeOpacity={0.8}
+          >
+            <Feather name="image" size={14} color={galleryTab === 'visual' ? colors.background : colors.textSecondary} />
+            <Text style={[styles.tabPillText, galleryTab === 'visual' && styles.tabPillTextActive]}>
+              {t('visualGallery')}
+            </Text>
+            <View style={[styles.tabBadge, galleryTab === 'visual' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, galleryTab === 'visual' && styles.tabBadgeTextActive]}>{artifactsData.length}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
@@ -587,37 +618,38 @@ export default function GalleryScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.text]} />
         }
       >
-        <Text style={styles.sectionTitle}>{t('playlist')}</Text>
-        <View style={styles.audioList}>
-          {isLoading ? (
-            <ActivityIndicator size="large" color={colors.text} style={{ marginVertical: 20 }} />
-          ) : playlist.length === 0 ? (
-            <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>{t('noAudio')}</Text>
-          ) : (
-            playlist.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.desc.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={styles.audioCard}
-                onPress={() => playTrack(item)}
-                activeOpacity={0.7}
-              >
-                <Image source={item.img} style={styles.audioThumb} />
-                <View style={styles.audioInfo}>
-                  <Text style={styles.audioTitle}>{item.title}</Text>
-                  <Text style={styles.audioDesc}>{item.desc}</Text>
-                </View>
-                <View style={styles.playBtnSmall}>
-                  <Feather name="play" size={16} color={colors.text} style={{ marginLeft: 2 }} />
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
+        {/* ── Tab: Daftar Putar ── */}
+        {galleryTab === 'playlist' && (
+          <View style={styles.audioList}>
+            {isLoading ? (
+              <ActivityIndicator size="large" color={colors.text} style={{ marginVertical: 20 }} />
+            ) : playlist.length === 0 ? (
+              <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>{t('noAudio')}</Text>
+            ) : (
+              playlist.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.desc.toLowerCase().includes(searchQuery.toLowerCase())).map(item => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  style={styles.audioCard}
+                  onPress={() => playTrack(item)}
+                  activeOpacity={0.7}
+                >
+                  <Image source={item.img} style={styles.audioThumb} />
+                  <View style={styles.audioInfo}>
+                    <Text style={styles.audioTitle}>{item.title}</Text>
+                    <Text style={styles.audioDesc}>{item.desc}</Text>
+                  </View>
+                  <View style={styles.playBtnSmall}>
+                    <Feather name="play" size={16} color={colors.text} style={{ marginLeft: 2 }} />
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
 
-        <Text style={styles.sectionTitle}>{t('visualGallery')}</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 16, paddingHorizontal: 20 }}>
-          {artifactsData.length} koleksi foto & video artefak bersejarah
-        </Text>
+        {/* ── Tab: Galeri Visual ── */}
+        {galleryTab === 'visual' && (
+          <View>
         
         {artifactsData.length === 0 ? (
           <View style={{ padding: 30, alignItems: 'center' }}>
@@ -713,7 +745,10 @@ export default function GalleryScreen() {
           </View>
         )}
 
-        <View style={{ height: 20 }} />
+        {galleryTab === 'visual' && (
+          <View style={{ height: 20 }} />
+        )}
+        </View>)}
       </ScrollView>
 
       {/* MODAL FOTO DETAIL */}
@@ -1151,14 +1186,63 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   
   stickyHeader: {
     backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
     paddingTop: 16,
     zIndex: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  tabPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tabPillActive: {
+    backgroundColor: colors.text,
+    borderColor: colors.text,
+  },
+  tabPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  tabPillTextActive: {
+    color: colors.background,
+  },
+  tabBadge: {
+    backgroundColor: colors.border,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  tabBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  tabBadgeTextActive: {
+    color: colors.background,
   },
   searchWrapper: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   searchBar: {
     flexDirection: 'row',

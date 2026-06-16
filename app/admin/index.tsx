@@ -890,8 +890,10 @@ export default function AdminPanel() {
         <Text style={styles.formLabel}>Jadwal Operasional / Waktu Buka (Opsional)</Text>
         <TextInput style={styles.formInput} value={aOpenHours} onChangeText={setAOpenHours} placeholder="cth: Buka 24 Jam atau 08:00 - 17:00" placeholderTextColor={colors.textSecondary} />
 
-        {/* ── Map Picker untuk Koordinat ── */}
-        <Text style={styles.formLabel}>Lokasi di Peta</Text>
+        {/* ── Koordinat Lokasi ── */}
+        <Text style={styles.formLabel}>Lokasi Koordinat</Text>
+
+        {/* Opsi 1: Pilih di Peta */}
         <TouchableOpacity
           style={styles.mapOpenButton}
           onPress={() => {
@@ -908,6 +910,41 @@ export default function AdminPanel() {
             {aLat !== null && aLng !== null ? 'Ubah Lokasi di Peta' : 'Pilih Lokasi di Peta'}
           </Text>
         </TouchableOpacity>
+
+        {/* Opsi 2: Input Manual */}
+        <Text style={[styles.mapPickerHint, { marginTop: 12, marginBottom: 6 }]}>Atau masukkan koordinat secara manual:</Text>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.formLabel, { marginTop: 0, marginBottom: 6 }]}>Latitude</Text>
+            <TextInput
+              style={styles.formInput}
+              value={aLat !== null ? String(aLat) : ''}
+              onChangeText={(val) => {
+                if (val === '' || val === '-') { setALat(null); return; }
+                const num = parseFloat(val);
+                if (!isNaN(num)) setALat(num);
+              }}
+              placeholder="cth: 0.9166"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.formLabel, { marginTop: 0, marginBottom: 6 }]}>Longitude</Text>
+            <TextInput
+              style={styles.formInput}
+              value={aLng !== null ? String(aLng) : ''}
+              onChangeText={(val) => {
+                if (val === '' || val === '-') { setALng(null); return; }
+                const num = parseFloat(val);
+                if (!isNaN(num)) setALng(num);
+              }}
+              placeholder="cth: 104.4333"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
 
         {aLat !== null && aLng !== null ? (
           <View style={styles.coordResult}>
