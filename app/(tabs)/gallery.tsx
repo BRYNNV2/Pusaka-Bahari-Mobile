@@ -583,7 +583,10 @@ export default function GalleryScreen() {
         <View style={styles.tabRow}>
           <TouchableOpacity
             style={[styles.tabPill, galleryTab === 'playlist' && styles.tabPillActive]}
-            onPress={() => setGalleryTab('playlist')}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setGalleryTab('playlist');
+            }}
             activeOpacity={0.8}
           >
             <Feather name="music" size={14} color={galleryTab === 'playlist' ? colors.background : colors.textSecondary} />
@@ -596,7 +599,10 @@ export default function GalleryScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabPill, galleryTab === 'visual' && styles.tabPillActive]}
-            onPress={() => setGalleryTab('visual')}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setGalleryTab('visual');
+            }}
             activeOpacity={0.8}
           >
             <Feather name="image" size={14} color={galleryTab === 'visual' ? colors.background : colors.textSecondary} />

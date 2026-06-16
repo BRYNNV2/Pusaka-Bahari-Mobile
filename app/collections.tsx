@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, ActivityIndicator, ScrollView, Platform, UIManager, LayoutAnimation } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,10 @@ import { FlashList } from "@shopify/flash-list";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width } = Dimensions.get('window');
 const FALLBACK_IMAGE = require('../assets/images/naskah_gurindam_1776493215711.webp');
@@ -177,7 +181,10 @@ export default function CollectionsScreen() {
                <TouchableOpacity 
                  key={tab}
                  style={[styles.categoryPill, isActive ? styles.categoryPillActive : { backgroundColor: colors.border }]}
-                 onPress={() => setActiveTab(tab)}
+                 onPress={() => {
+                   LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                   setActiveTab(tab);
+                 }}
                  activeOpacity={0.8}
                >
                  <Text style={[styles.categoryText, isActive ? styles.categoryTextActive : { color: colors.textSecondary }]}>{tab}</Text>

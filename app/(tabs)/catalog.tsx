@@ -14,7 +14,15 @@ import {
   Dimensions,
   Modal,
   ScrollView,
+  Platform,
+  UIManager,
+  LayoutAnimation,
 } from 'react-native';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -230,7 +238,10 @@ export default function CatalogScreen() {
             return (
               <TouchableOpacity 
                 style={[styles.categoryPill, isActive && styles.categoryPillActive]}
-                onPress={() => setActiveCategory(item)}
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setActiveCategory(item);
+                }}
               >
                 <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>
                   {item}
