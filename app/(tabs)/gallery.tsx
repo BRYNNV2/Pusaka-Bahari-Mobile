@@ -553,20 +553,13 @@ export default function GalleryScreen() {
       <StatusBar barStyle={showPlayer ? "light-content" : "dark-content"} />
       <SafeAreaView edges={['top']} style={{ flex: 0, backgroundColor: colors.card }} />
       
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.text]} />
-        }
-      >
+      {/* Sticky Header + Search */}
+      <View style={styles.stickyHeader}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{t('galleryAndMedia')}</Text>
           <Text style={styles.headerDesc}>{t('galleryDesc')}</Text>
         </View>
 
-        
-        {/* Search Bar */}
         <View style={styles.searchWrapper}>
           <View style={styles.searchBar}>
             <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
@@ -584,7 +577,16 @@ export default function GalleryScreen() {
             )}
           </View>
         </View>
+      </View>
 
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.text]} />
+        }
+      >
         <Text style={styles.sectionTitle}>{t('playlist')}</Text>
         <View style={styles.audioList}>
           {isLoading ? (
@@ -1147,9 +1149,16 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   
+  stickyHeader: {
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingTop: 16,
+    zIndex: 10,
+  },
   searchWrapper: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   searchBar: {
     flexDirection: 'row',
@@ -1157,7 +1166,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     backgroundColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
-    height: 52,
+    height: 48,
   },
   searchIcon: {
     marginRight: 12,
@@ -1171,22 +1180,23 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
 
   scrollContainer: {
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 16,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: 12,
+    paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '800',
     color: colors.text,
-    letterSpacing: -1,
-    marginBottom: 8,
+    letterSpacing: -0.5,
+    marginBottom: 4,
   },
   headerDesc: {
-    fontSize: 16,
+    fontSize: 14,
     color: colors.textSecondary,
-    lineHeight: 24,
+    lineHeight: 20,
   },
   sectionTitle: {
     fontSize: 20,
