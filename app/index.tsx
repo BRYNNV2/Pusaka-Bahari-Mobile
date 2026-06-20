@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LottieView from 'lottie-react-native';
 
 export default function Index() {
   const { isLoggedIn, loading } = useAuth();
@@ -17,7 +18,12 @@ export default function Index() {
   if (loading || hasSeenOnboarding === null) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#ffffff" />
+        <LottieView
+          source={require('../assets/animations/Free Searching Animation.json')}
+          autoPlay
+          loop
+          style={{ width: 180, height: 180 }}
+        />
       </View>
     );
   }

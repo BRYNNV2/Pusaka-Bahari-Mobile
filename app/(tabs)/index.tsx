@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
+import LottieView from 'lottie-react-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -739,11 +740,16 @@ export default function HomeScreen() {
 
             <View style={[styles.gridContainer, { opacity: loadingContent ? 0.6 : 1 }]}>
               {loadingContent && filteredArtifacts.length === 0 ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%' }}>
-                  <SkeletonCard isDark={isDark} />
-                  <SkeletonCard isDark={isDark} />
-                  <SkeletonCard isDark={isDark} />
-                  <SkeletonCard isDark={isDark} />
+                <View style={{ width: '100%', padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+                  <LottieView
+                    source={require('../../assets/animations/Free Searching Animation.json')}
+                    autoPlay
+                    loop
+                    style={{ width: 150, height: 150 }}
+                  />
+                  <Text style={{ color: colors.textSecondary, fontWeight: '600', marginTop: 12, fontSize: 13, textAlign: 'center' }}>
+                    {language === 'en' ? 'Searching historical assets...' : 'Mencari warisan bahari...'}
+                  </Text>
                 </View>
               ) : filteredArtifacts.length === 0 ? (
                 <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
