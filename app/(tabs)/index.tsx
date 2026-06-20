@@ -651,40 +651,6 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Quick Search Tags */}
-          <View style={styles.quickTagsContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickTagsScroll}>
-              {[
-                { label: '📜 Gurindam 12', query: 'gurindam' },
-                { label: '🕌 Masjid', query: 'masjid' },
-                { label: '🚢 Jong', query: 'jong' },
-                { label: '📖 Naskah', query: 'naskah' },
-                { label: '📍 Istana', query: 'istana' }
-              ].map((tag, idx) => {
-                const isActive = searchQuery.toLowerCase().includes(tag.query);
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[styles.quickTagItem, isActive && styles.quickTagItemActive]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                      if (isActive) {
-                        setSearchQuery('');
-                      } else {
-                        setSearchQuery(tag.label.substring(3));
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.quickTagText, isActive && styles.quickTagTextActive]}>
-                      {tag.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
           {/* 🌤️ Weather & Sea Safety Widget */}
           <View style={styles.weatherCard}>
             <View style={styles.weatherHeader}>
@@ -999,36 +965,6 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  quickTagsContainer: {
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  quickTagsScroll: {
-    paddingHorizontal: 0,
-    gap: 8,
-  },
-  quickTagItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-    borderWidth: 1,
-    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickTagItemActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  quickTagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  quickTagTextActive: {
-    color: '#0f172a',
   },
   safeArea: {
     flex: 1,
