@@ -18,6 +18,7 @@ import {
   UIManager,
   LayoutAnimation,
 } from 'react-native';
+import LottieView from 'lottie-react-native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -272,8 +273,13 @@ export default function CatalogScreen() {
       <View style={styles.listContainer}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.text} />
-            <Text style={styles.loadingText}>{t('catalogLoading')}</Text>
+            <LottieView
+              source={require('../../assets/animations/Free Searching Animation.json')}
+              autoPlay
+              loop
+              style={{ width: 150, height: 150 }}
+            />
+            <Text style={[styles.loadingText, { marginTop: 10 }]}>{t('catalogLoading')}</Text>
           </View>
         ) : activeCategory === 'Kamus Istilah' ? (
           <FlatList

@@ -6,10 +6,10 @@ import {
   FlatList,
   TouchableOpacity,
   StatusBar,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LottieView from 'lottie-react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -191,8 +191,13 @@ export default function NotificationsScreen() {
 
       {loading ? (
         <View style={styles.centerWrap}>
-          <ActivityIndicator size="large" color={colors.text} />
-          <Text style={styles.loadingText}>{t('notifLoading')}</Text>
+          <LottieView
+            source={require('../assets/animations/Free Searching Animation.json')}
+            autoPlay
+            loop
+            style={{ width: 150, height: 150 }}
+          />
+          <Text style={[styles.loadingText, { marginTop: 10 }]}>{t('notifLoading')}</Text>
         </View>
       ) : (
         <FlatList

@@ -15,6 +15,7 @@ import {
   BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LottieView from 'lottie-react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -424,7 +425,12 @@ export default function LoginScreen() {
   if (isInitializingTab) {
     return (
       <View style={{ flex: 1, backgroundColor: isDark ? colors.background : '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={primaryBlue} />
+        <LottieView
+          source={require('../assets/animations/Free Searching Animation.json')}
+          autoPlay
+          loop
+          style={{ width: 180, height: 180 }}
+        />
       </View>
     );
   }

@@ -9,6 +9,7 @@ import { ScrollView, StatusBar, StyleSheet, Text,
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
+import LottieView from 'lottie-react-native';
 
 const customLayoutSpring = {
   duration: 400,
@@ -645,7 +646,14 @@ export default function GalleryScreen() {
         {galleryTab === 'playlist' && (
           <View style={styles.audioList}>
             {isLoading ? (
-              <ActivityIndicator size="large" color={colors.text} style={{ marginVertical: 20 }} />
+              <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 40, width: '100%' }}>
+                <LottieView
+                  source={require('../../assets/animations/Free Searching Animation.json')}
+                  autoPlay
+                  loop
+                  style={{ width: 140, height: 140 }}
+                />
+              </View>
             ) : playlist.length === 0 ? (
               <Text style={{ color: colors.textSecondary, fontStyle: 'italic' }}>{t('noAudio')}</Text>
             ) : (

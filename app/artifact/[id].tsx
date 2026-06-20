@@ -40,6 +40,7 @@ import ImageViewing from 'react-native-image-viewing';
 import * as Haptics from 'expo-haptics';
 import CustomToast, { CustomToastManager as Toast } from '@/components/CustomToast';
 import { WebView } from 'react-native-webview';
+import LottieView from 'lottie-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -477,8 +478,13 @@ export default function ArtifactDetailScreen() {
     return (
       <View style={styles.loadingScreen}>
         <StatusBar barStyle="dark-content" />
-        <ActivityIndicator size="large" color="#0f172a" />
-        <Text style={styles.loadingText}>{t('artLoading')}</Text>
+        <LottieView
+          source={require('../../assets/animations/Free Searching Animation.json')}
+          autoPlay
+          loop
+          style={{ width: 150, height: 150 }}
+        />
+        <Text style={[styles.loadingText, { marginTop: 10 }]}>{t('artLoading')}</Text>
       </View>
     );
   }

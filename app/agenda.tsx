@@ -5,12 +5,12 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   StatusBar,
   Dimensions,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LottieView from 'lottie-react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -221,8 +221,13 @@ export default function AgendaScreen() {
 
       {loading ? (
         <View style={styles.centerWrap}>
-          <ActivityIndicator size="large" color={colors.text} />
-          <Text style={styles.loadingText}>{t('agendaLoading')}</Text>
+          <LottieView
+            source={require('../assets/animations/Free Searching Animation.json')}
+            autoPlay
+            loop
+            style={{ width: 150, height: 150 }}
+          />
+          <Text style={[styles.loadingText, { marginTop: 10 }]}>{t('agendaLoading')}</Text>
         </View>
       ) : (
         <FlatList

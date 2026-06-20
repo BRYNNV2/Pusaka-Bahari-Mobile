@@ -36,6 +36,7 @@ import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
 import * as Haptics from 'expo-haptics';
 import { CustomToastManager as Toast } from '@/components/CustomToast';
+import LottieView from 'lottie-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -312,8 +313,13 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? colors.background : '#0f172a' }]}>
-        <ActivityIndicator size="large" color="#ffffff" />
-        <Text style={{ marginTop: 16, color: '#94a3b8', fontSize: 14, fontWeight: '600', letterSpacing: 0.3 }}>
+        <LottieView
+          source={require('../assets/animations/Free Searching Animation.json')}
+          autoPlay
+          loop
+          style={{ width: 150, height: 150 }}
+        />
+        <Text style={{ marginTop: 10, color: '#94a3b8', fontSize: 14, fontWeight: '600', letterSpacing: 0.3 }}>
           Memuat Profil...
         </Text>
       </View>

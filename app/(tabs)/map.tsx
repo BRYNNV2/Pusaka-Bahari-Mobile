@@ -1,9 +1,10 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ActivityIndicator, Dimensions, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LottieView from 'lottie-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -347,8 +348,13 @@ export default function MapScreen() {
       {/* Loading Overlay */}
       {loading && markers.length === 0 && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.text} />
-          <Text style={styles.loadingText}>{t('mapLoadingSites')}</Text>
+          <LottieView
+            source={require('../../assets/animations/Free Searching Animation.json')}
+            autoPlay
+            loop
+            style={{ width: 160, height: 160 }}
+          />
+          <Text style={[styles.loadingText, { marginTop: 10 }]}>{t('mapLoadingSites')}</Text>
         </View>
       )}
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Platform, StatusBar } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform, StatusBar } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import LottieView from 'lottie-react-native';
 
 export default function PdfViewer() {
   const router = useRouter();
@@ -49,14 +50,24 @@ export default function PdfViewer() {
           startInLoadingState={true}
           renderLoading={() => (
             <View style={styles.loaderContainer}>
-              <ActivityIndicator size="large" color="#8B5E3C" />
+              <LottieView
+                source={require('../assets/animations/Free Searching Animation.json')}
+                autoPlay
+                loop
+                style={{ width: 140, height: 140 }}
+              />
               <Text style={styles.loaderText}>Menyiapkan penampil dokumen...</Text>
             </View>
           )}
         />
         {loading && (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#8B5E3C" />
+            <LottieView
+              source={require('../assets/animations/Free Searching Animation.json')}
+              autoPlay
+              loop
+              style={{ width: 140, height: 140 }}
+            />
             <Text style={styles.loaderText}>Memuat dokumen PDF...</Text>
           </View>
         )}
