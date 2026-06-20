@@ -12,6 +12,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 import LottieView from 'lottie-react-native';
+import NetInfo from '@react-native-community/netinfo';
+import { CustomToastManager as Toast } from '@/components/CustomToast';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -120,6 +122,7 @@ export default function HomeScreen() {
   const [weatherData, setWeatherData] = useState<any>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
+
 
   const fetchUnreadCount = async () => {
     try {
@@ -356,6 +359,38 @@ export default function HomeScreen() {
       setLoadingContent(false);
     }
   };
+
+  // NetInfo network connection listener
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const connected = state.isConnected !== false && state.isInternetReachable !== false;
+      const currentlyOffline = !connected;
+      
+      if (isOffline && !currentlyOffline) {
+        setIsOffline(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Toast.show({
+          type: 'success',
+          text1: language === 'en' ? 'Back Online' : 'Koneksi Terhubung',
+          text2: language === 'en' ? 'Refreshing content...' : 'Memperbarui data...',
+          visibilityTime: 4000,
+        });
+        fetchArtifacts();
+        fetchWeather();
+      } else if (!isOffline && currentlyOffline) {
+        setIsOffline(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        Toast.show({
+          type: 'error',
+          text1: language === 'en' ? 'Connection Lost' : 'Koneksi Terputus',
+          text2: language === 'en' ? 'Showing cached content.' : 'Menampilkan data dari cache.',
+          visibilityTime: 4000,
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isOffline, language]);
 
   const fetchAgendaFast = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -700,8 +735,6 @@ export default function HomeScreen() {
               </View>
             ) : null}
           </View>
-
-
 
           {/* 4. Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
