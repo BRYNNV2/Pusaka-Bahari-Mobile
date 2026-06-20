@@ -298,7 +298,7 @@ export default function CatalogScreen() {
             renderItem={renderItem}
             numColumns={2}
             columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 24 }}
-            contentContainerStyle={{ paddingBottom: 20, paddingTop: 8, gap: 20 }}
+            contentContainerStyle={{ paddingBottom: 110, paddingTop: 8, gap: 20 }}
             showsVerticalScrollIndicator={false}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}

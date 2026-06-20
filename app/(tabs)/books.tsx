@@ -434,7 +434,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
   gridRow: {
     justifyContent: 'space-between',

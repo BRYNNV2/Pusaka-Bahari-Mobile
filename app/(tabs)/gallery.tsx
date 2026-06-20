@@ -1288,6 +1288,7 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   scrollContainer: {
     paddingHorizontal: 24,
     paddingTop: 16,
+    paddingBottom: 110,
   },
   header: {
     marginBottom: 12,
