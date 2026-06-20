@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import * as Haptics from 'expo-haptics';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -29,6 +30,42 @@ const HERO_IMAGES = [
   require('../../assets/images/masjid_penyengat_1776493242751.webp'),
   require('../../assets/images/naskah_gurindam_1776493215711.webp'),
 ];
+
+function SkeletonCard({ isDark }: { isDark: boolean }) {
+  const animatedValue = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 0.9,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [animatedValue]);
+
+  return (
+    <Animated.View
+      style={{
+        width: '48%',
+        height: 180,
+        borderRadius: 16,
+        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+        marginBottom: 16,
+        opacity: animatedValue,
+      }}
+    />
+  );
+}
 
 export default function HomeScreen() {
   const { mode, isDark, colors } = useTheme();
@@ -614,6 +651,40 @@ export default function HomeScreen() {
             )}
           </View>
 
+          {/* Quick Search Tags */}
+          <View style={styles.quickTagsContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickTagsScroll}>
+              {[
+                { label: '📜 Gurindam 12', query: 'gurindam' },
+                { label: '🕌 Masjid', query: 'masjid' },
+                { label: '🚢 Jong', query: 'jong' },
+                { label: '📖 Naskah', query: 'naskah' },
+                { label: '📍 Istana', query: 'istana' }
+              ].map((tag, idx) => {
+                const isActive = searchQuery.toLowerCase().includes(tag.query);
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.quickTagItem, isActive && styles.quickTagItemActive]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                      if (isActive) {
+                        setSearchQuery('');
+                      } else {
+                        setSearchQuery(tag.label.substring(3));
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.quickTagText, isActive && styles.quickTagTextActive]}>
+                      {tag.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
           {/* 🌤️ Weather & Sea Safety Widget */}
           <View style={styles.weatherCard}>
             <View style={styles.weatherHeader}>
@@ -675,7 +746,10 @@ export default function HomeScreen() {
                 <TouchableOpacity 
                   key={index} 
                   style={[styles.categoryPill, isActive && styles.categoryPillActive]}
-                  onPress={() => setActiveCategory(item)}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    setActiveCategory(item);
+                  }}
                   activeOpacity={0.8}
                 >
                   {iconConfig && (
@@ -699,8 +773,11 @@ export default function HomeScreen() {
 
             <View style={[styles.gridContainer, { opacity: loadingContent ? 0.6 : 1 }]}>
               {loadingContent && filteredArtifacts.length === 0 ? (
-                <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color={colors.primary} />
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%' }}>
+                  <SkeletonCard isDark={isDark} />
+                  <SkeletonCard isDark={isDark} />
+                  <SkeletonCard isDark={isDark} />
+                  <SkeletonCard isDark={isDark} />
                 </View>
               ) : filteredArtifacts.length === 0 ? (
                 <View style={{ width: '100%', padding: 40, alignItems: 'center' }}>
@@ -922,6 +999,36 @@ const getStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  quickTagsContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  quickTagsScroll: {
+    paddingHorizontal: 0,
+    gap: 8,
+  },
+  quickTagItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickTagItemActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  quickTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  quickTagTextActive: {
+    color: '#0f172a',
   },
   safeArea: {
     flex: 1,

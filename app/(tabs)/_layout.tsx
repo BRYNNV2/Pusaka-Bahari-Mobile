@@ -5,6 +5,8 @@ import { Platform, View, StyleSheet, TouchableOpacity, Text, Animated, Dimension
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 
+import * as Haptics from 'expo-haptics';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function CustomTabBar({ state, descriptors, navigation, colors, isDark, t }: any) {
@@ -38,6 +40,9 @@ function CustomTabBar({ state, descriptors, navigation, colors, isDark, t }: any
         const isFocused = state.index === index;
 
         const onPress = () => {
+          // Play haptic feedback on tab change
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
           const event = navigation.emit({
             type: 'tabPress',
             target: route.key,

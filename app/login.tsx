@@ -23,6 +23,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn, FadeInUp } from 'react-native-reanimated';
 import { CustomToastManager as Toast } from '@/components/CustomToast';
+import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -103,9 +104,13 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
+    // Light haptic impact on button press
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
     if (!email || !password) {
       const msg = t('loginErrEmailPass') || 'Email dan password harus diisi';
       setErrorMsg(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Gagal Login', text2: msg, position: 'top', visibilityTime: 4000 });
       return;
     }
@@ -116,12 +121,15 @@ export default function LoginScreen() {
       if (error) {
         const msg = translateError(error);
         setErrorMsg(msg);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         Toast.show({ type: 'error', text1: 'Gagal Login', text2: msg, position: 'top', visibilityTime: 4000 });
       } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         router.replace('/(tabs)');
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'Terjadi kesalahan jaringan');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Gagal Login', text2: e.message || 'Terjadi kesalahan jaringan', position: 'top', visibilityTime: 4000 });
     } finally {
       setIsLoading(false);
@@ -129,27 +137,34 @@ export default function LoginScreen() {
   };
 
   const handleRegister = async () => {
+    // Light haptic impact on button press
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
     if (!fullName || !email || !password || !confirmPassword) {
       const msg = t('loginErrAllField') || 'Semua kolom harus diisi';
       setErrorMsg(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Pendaftaran Gagal', text2: msg, position: 'top', visibilityTime: 4000 });
       return;
     }
     if (password !== confirmPassword) {
       const msg = t('loginErrMatch') || 'Password tidak cocok';
       setErrorMsg(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Pendaftaran Gagal', text2: msg, position: 'top', visibilityTime: 4000 });
       return;
     }
     if (password.length < 6) {
       const msg = t('loginErrLength') || 'Password minimal 6 karakter';
       setErrorMsg(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Pendaftaran Gagal', text2: msg, position: 'top', visibilityTime: 4000 });
       return;
     }
     if (!agreed) {
       const msg = 'Anda harus menyetujui Syarat & Ketentuan';
       setErrorMsg(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Pendaftaran Gagal', text2: msg, position: 'top', visibilityTime: 4000 });
       return;
     }
@@ -160,16 +175,22 @@ export default function LoginScreen() {
       if (error) {
         const msg = translateError(error);
         setErrorMsg(msg);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         Toast.show({ type: 'error', text1: 'Pendaftaran Gagal', text2: msg, position: 'top', visibilityTime: 4000 });
       } else {
-        Alert.alert(
-          t('loginRegSuccessTitle') || 'Berhasil',
-          t('loginRegSuccessDesc') || 'Akun berhasil dibuat. Silakan login.',
-          [{ text: 'OK', onPress: () => handleTabSwitch('login') }]
-        );
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Toast.show({
+          type: 'success',
+          text1: t('loginRegSuccessTitle') || 'Berhasil',
+          text2: t('loginRegSuccessDesc') || 'Akun berhasil dibuat. Silakan login.',
+          position: 'top',
+          visibilityTime: 5000,
+        });
+        handleTabSwitch('login');
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'Terjadi kesalahan jaringan');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Pendaftaran Gagal', text2: e.message || 'Terjadi kesalahan jaringan', position: 'top', visibilityTime: 4000 });
     } finally {
       setIsLoading(false);
@@ -177,9 +198,13 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = async () => {
+    // Light haptic impact on button press
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
     if (!email) {
       const msg = 'Silakan isi email Anda terlebih dahulu untuk mereset kata sandi';
       setErrorMsg(msg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Email Kosong', text2: msg, position: 'top', visibilityTime: 4000 });
       return;
     }
@@ -190,12 +215,15 @@ export default function LoginScreen() {
       if (error) {
         const msg = translateError({ message: error });
         setErrorMsg(msg);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         Toast.show({ type: 'error', text1: 'Gagal Kirim Tautan', text2: msg, position: 'top', visibilityTime: 4000 });
       } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         Toast.show({ type: 'success', text1: 'Tautan Terkirim', text2: 'Silakan periksa email Anda untuk mereset kata sandi.', position: 'top', visibilityTime: 5000 });
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'Terjadi kesalahan jaringan');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Toast.show({ type: 'error', text1: 'Gagal Kirim Tautan', text2: e.message || 'Terjadi kesalahan jaringan', position: 'top', visibilityTime: 4000 });
     } finally {
       setIsLoading(false);

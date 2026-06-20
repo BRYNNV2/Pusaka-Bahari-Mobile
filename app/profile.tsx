@@ -34,6 +34,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
+import * as Haptics from 'expo-haptics';
+import { CustomToastManager as Toast } from '@/components/CustomToast';
 
 const { width, height } = Dimensions.get('window');
 
@@ -146,6 +148,7 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     if (!user) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setSaving(true);
     try {
       const { data, error } = await supabase.from('profiles').upsert({
@@ -157,15 +160,44 @@ export default function ProfileScreen() {
       if (error) throw error;
       setProfile(data as Profile);
       setIsEditing(false);
-      Alert.alert('Berhasil', 'Profil Anda telah diperbarui.');
-    } catch (e: any) { Alert.alert('Gagal', e.message); }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Toast.show({
+        type: 'success',
+        text1: 'Berhasil',
+        text2: 'Profil Anda telah diperbarui.',
+        position: 'top',
+        visibilityTime: 3000,
+      });
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Toast.show({
+        type: 'error',
+        text1: 'Gagal Memperbarui',
+        text2: e.message || 'Terjadi kesalahan.',
+        position: 'top',
+        visibilityTime: 4000,
+      });
+    }
     finally { setSaving(false); }
   };
 
   const handleUpdatePassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) return Alert.alert('Input Kosong', 'Mohon isi semua kolom.');
-    if (newPassword !== confirmPassword) return Alert.alert('Error', 'Konfirmasi password tidak cocok.');
-    if (newPassword.length < 6) return Alert.alert('Terlalu Pendek', 'Minimal 6 karakter.');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Toast.show({ type: 'error', text1: 'Input Kosong', text2: 'Mohon isi semua kolom.', position: 'top', visibilityTime: 3000 });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Konfirmasi password tidak cocok.', position: 'top', visibilityTime: 3000 });
+      return;
+    }
+    if (newPassword.length < 6) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Toast.show({ type: 'error', text1: 'Terlalu Pendek', text2: 'Minimal 6 karakter.', position: 'top', visibilityTime: 3000 });
+      return;
+    }
     
     setLoadingPass(true);
     try {
@@ -192,11 +224,25 @@ export default function ProfileScreen() {
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) throw updateError;
 
-      Alert.alert('Sukses', 'Kata sandi berhasil diperbarui!');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Toast.show({
+        type: 'success',
+        text1: 'Sukses',
+        text2: 'Kata sandi berhasil diperbarui!',
+        position: 'top',
+        visibilityTime: 3000,
+      });
       setIsChangingPass(false);
       setOldPassword(''); setNewPassword(''); setConfirmPassword('');
     } catch (e: any) {
-      Alert.alert('Gagal', e.message);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Toast.show({
+        type: 'error',
+        text1: 'Gagal',
+        text2: e.message || 'Gagal mengubah kata sandi.',
+        position: 'top',
+        visibilityTime: 4000,
+      });
     } finally {
       setLoadingPass(false);
     }
